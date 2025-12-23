@@ -1,1 +1,10 @@
 project_id = "kogxlpjzzmedlfdzwwvi"
+
+[functions.generate-podcast-script]
+verify_jwt = false
+
+[functions.generate-podcast-audio]
+verify_jwt = false
+
+[functions.list-voices]
+verify_jwt = false
