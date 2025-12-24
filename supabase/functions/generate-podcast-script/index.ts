@@ -5,16 +5,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface PodcastConfig {
+  speakerBackground: string;
+  podcastStructure: string;
+  textStyle: string;
+  topics: string;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { topic, duration = "5" } = await req.json();
+    const { config, duration = "5", variantCount = 3 } = await req.json();
     
-    if (!topic) {
-      throw new Error("Topic is required");
+    if (!config || !config.topics) {
+      throw new Error("Podcast configuration with topics is required");
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -22,20 +29,37 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log(`Generating podcast script for topic: "${topic}", duration: ${duration} minutes`);
+    console.log(`Generating ${variantCount} podcast script variants`);
+    console.log(`Topics: ${config.topics.slice(0, 100)}...`);
 
-    const systemPrompt = `You are an expert podcast script writer. Create engaging, conversational podcast scripts that sound natural when read aloud. 
+    const systemPrompt = `Du bist ein erfahrener Podcast-Skriptautor. Erstelle ansprechende, gesprächige Podcast-Skripte, die natürlich klingen, wenn sie laut vorgelesen werden.
 
-The script should:
-- Have a compelling introduction that hooks the listener
-- Include conversational transitions and natural pauses (marked with [PAUSE])
-- Have interesting insights, stories, or examples
-- Include a memorable conclusion with a call-to-action
-- Be written for a single host speaking directly to the audience
-- Sound authentic and passionate about the topic
-- Be approximately ${duration} minutes when read at a normal pace (roughly 150 words per minute)
+${config.speakerBackground ? `## SPRECHER-HINTERGRUND
+${config.speakerBackground}
 
-Do NOT include any stage directions or speaker labels - just write the actual spoken content.`;
+` : ""}${config.podcastStructure ? `## PODCAST-STRUKTUR UND AUFBAU
+${config.podcastStructure}
+
+` : ""}${config.textStyle ? `## TEXTSTIL-VORGABEN
+${config.textStyle}
+
+` : ""}## WICHTIGE REGELN
+- Das Skript sollte für etwa ${duration} Minuten reichen (ca. 150 Wörter pro Minute)
+- Schreibe NUR den gesprochenen Text - keine Regieanweisungen oder Sprecherkennzeichnungen
+- Markiere natürliche Pausen mit [PAUSE]
+- Der Text muss authentisch und leidenschaftlich klingen
+- Halte dich an den vorgegebenen Aufbau und Stil
+
+Generiere GENAU ${variantCount} verschiedene Varianten des Skripts. Jede Variante sollte einen leicht anderen Ansatz, Ton oder Fokus haben, aber alle müssen den Vorgaben entsprechen.
+
+Formatiere deine Antwort als JSON-Array mit ${variantCount} Objekten:
+[
+  {"id": 1, "content": "Erste Variante..."},
+  {"id": 2, "content": "Zweite Variante..."},
+  {"id": 3, "content": "Dritte Variante..."}
+]
+
+Antworte NUR mit dem JSON-Array, kein anderer Text.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -47,7 +71,7 @@ Do NOT include any stage directions or speaker labels - just write the actual sp
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Create an engaging podcast episode about: ${topic}` }
+          { role: "user", content: `Erstelle ${variantCount} Podcast-Skript-Varianten für folgende Themen:\n\n${config.topics}` }
         ],
       }),
     });
@@ -72,15 +96,41 @@ Do NOT include any stage directions or speaker labels - just write the actual sp
     }
 
     const data = await response.json();
-    const script = data.choices?.[0]?.message?.content;
+    let content = data.choices?.[0]?.message?.content;
 
-    if (!script) {
+    if (!content) {
       throw new Error("No script generated");
     }
 
-    console.log(`Script generated successfully, length: ${script.length} characters`);
+    // Clean up the response - remove markdown code blocks if present
+    content = content.trim();
+    if (content.startsWith("```json")) {
+      content = content.slice(7);
+    } else if (content.startsWith("```")) {
+      content = content.slice(3);
+    }
+    if (content.endsWith("```")) {
+      content = content.slice(0, -3);
+    }
+    content = content.trim();
 
-    return new Response(JSON.stringify({ script }), {
+    // Parse the JSON array
+    let variants;
+    try {
+      variants = JSON.parse(content);
+      if (!Array.isArray(variants)) {
+        throw new Error("Response is not an array");
+      }
+    } catch (parseError) {
+      console.error("Failed to parse variants JSON:", parseError);
+      console.error("Content was:", content.slice(0, 500));
+      // Fallback: return the content as a single variant
+      variants = [{ id: 1, content: content }];
+    }
+
+    console.log(`Generated ${variants.length} script variants successfully`);
+
+    return new Response(JSON.stringify({ variants }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
