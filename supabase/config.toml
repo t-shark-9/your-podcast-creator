@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.optimize-podcast-script]
 verify_jwt = false
+
+[functions.generate-podcast-video]
+verify_jwt = false

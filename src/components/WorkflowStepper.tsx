@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
-import { Check, Settings, FileText, Wand2, Volume2 } from "lucide-react";
+import { Check, Settings, FileText, Wand2, Volume2, Video } from "lucide-react";
 
-export type WorkflowStep = "config" | "variants" | "optimize" | "audio";
+export type WorkflowStep = "config" | "variants" | "optimize" | "audio" | "video";
 
 interface WorkflowStepperProps {
   currentStep: WorkflowStep;
@@ -12,7 +12,8 @@ const steps: { id: WorkflowStep; label: string; icon: React.ElementType }[] = [
   { id: "config", label: "Konfiguration", icon: Settings },
   { id: "variants", label: "Script-Varianten", icon: FileText },
   { id: "optimize", label: "Optimierung", icon: Wand2 },
-  { id: "audio", label: "Vertonung", icon: Volume2 }
+  { id: "audio", label: "Audio", icon: Volume2 },
+  { id: "video", label: "Video", icon: Video }
 ];
 
 export const WorkflowStepper = ({ currentStep, completedSteps }: WorkflowStepperProps) => {

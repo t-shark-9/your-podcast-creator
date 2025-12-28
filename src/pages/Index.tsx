@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PodcastConfig, PodcastConfigData } from "@/components/PodcastConfig";
+import { VideoConfig, VideoConfigData } from "@/components/VideoConfig";
 import { ScriptVariantSelector } from "@/components/ScriptVariantSelector";
 import { ScriptOptimizer } from "@/components/ScriptOptimizer";
 import { WorkflowStepper, WorkflowStep } from "@/components/WorkflowStepper";
 import { AudioPlayer } from "@/components/AudioPlayer";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import { VoiceSelector } from "@/components/VoiceSelector";
 import { GenerationStatus } from "@/components/GenerationStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles } from "lucide-react";
+import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ScriptVariant {
   id: number;
@@ -29,6 +32,11 @@ const Index = () => {
     textStyle: "",
     topics: ""
   });
+  const [videoConfig, setVideoConfig] = useState<VideoConfigData>({
+    background: "",
+    character1: "",
+    character2: ""
+  });
   const [duration, setDuration] = useState(5);
   
   // Script state
@@ -41,12 +49,53 @@ const Index = () => {
   const [voiceId, setVoiceId] = useState("JBFqnCBsd6RMkjVDRZzb");
   const [audioUrl, setAudioUrl] = useState<string>("");
   
+  // Video state
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [videoPredictionId, setVideoPredictionId] = useState<string | null>(null);
+  const [videoStatus, setVideoStatus] = useState<string>("");
+  
   // Loading states
   const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   
   const { toast } = useToast();
+
+  // Poll video generation status
+  useEffect(() => {
+    if (!videoPredictionId || videoUrl) return;
+
+    const pollStatus = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-podcast-video", {
+          body: { predictionId: videoPredictionId }
+        });
+
+        if (error) throw error;
+
+        setVideoStatus(data.status);
+
+        if (data.status === "succeeded" && data.output) {
+          const outputUrl = Array.isArray(data.output) ? data.output[0] : data.output;
+          setVideoUrl(outputUrl);
+          setIsGeneratingVideo(false);
+          setCompletedSteps(prev => [...prev.filter(s => s !== "video"), "video"]);
+          toast({
+            title: "Video fertig!",
+            description: "Dein Podcast-Video wurde erfolgreich erstellt."
+          });
+        } else if (data.status === "failed") {
+          throw new Error("Video generation failed");
+        }
+      } catch (error) {
+        console.error("Video poll error:", error);
+      }
+    };
+
+    const interval = setInterval(pollStatus, 3000);
+    return () => clearInterval(interval);
+  }, [videoPredictionId, videoUrl, toast]);
 
   const handleGenerateVariants = async () => {
     if (!config.topics.trim()) {
@@ -157,8 +206,8 @@ const Index = () => {
       setCompletedSteps(prev => [...prev.filter(s => s !== "audio"), "audio"]);
       
       toast({
-        title: "Podcast fertig!",
-        description: "Dein Podcast wurde erfolgreich erstellt."
+        title: "Audio fertig!",
+        description: "Dein Podcast-Audio wurde erfolgreich erstellt."
       });
     } catch (error) {
       console.error("Audio generation error:", error);
@@ -172,10 +221,50 @@ const Index = () => {
     }
   };
 
-  const handleReset = () => {
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
+  const handleContinueToVideo = () => {
+    setCurrentStep("video");
+  };
+
+  const handleGenerateVideo = async () => {
+    setIsGeneratingVideo(true);
+    setVideoStatus("starting");
+    setVideoUrl("");
+    setVideoPredictionId(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-podcast-video", {
+        body: {
+          prompt: config.topics.slice(0, 200),
+          background: videoConfig.background,
+          character1: videoConfig.character1,
+          character2: videoConfig.character2
+        }
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      if (!data?.predictionId) throw new Error("Video-Generierung konnte nicht gestartet werden");
+
+      setVideoPredictionId(data.predictionId);
+      setVideoStatus(data.status);
+      
+      toast({
+        title: "Video wird generiert",
+        description: "Die Generierung wurde gestartet. Dies kann einige Minuten dauern."
+      });
+    } catch (error) {
+      console.error("Video generation error:", error);
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Video-Generierung fehlgeschlagen",
+        variant: "destructive"
+      });
+      setIsGeneratingVideo(false);
     }
+  };
+
+  const handleReset = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setCurrentStep("config");
     setCompletedSteps([]);
     setVariants([]);
@@ -183,10 +272,13 @@ const Index = () => {
     setOptimizedScript(null);
     setFinalScript("");
     setAudioUrl("");
+    setVideoUrl("");
+    setVideoPredictionId(null);
+    setVideoStatus("");
   };
 
   const handleBack = () => {
-    const steps: WorkflowStep[] = ["config", "variants", "optimize", "audio"];
+    const steps: WorkflowStep[] = ["config", "variants", "optimize", "audio", "video"];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]);
@@ -215,12 +307,12 @@ const Index = () => {
             <span className="text-gradient">PodcastAI</span>
           </h1>
           <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">
-            Professionelle Podcasts mit deiner Stimme erstellen
+            Professionelle Podcasts mit Video erstellen
           </p>
         </header>
 
         {/* Workflow Stepper */}
-        <div className="max-w-3xl mx-auto mb-8">
+        <div className="max-w-4xl mx-auto mb-8">
           <WorkflowStepper currentStep={currentStep} completedSteps={completedSteps} />
         </div>
 
@@ -231,11 +323,28 @@ const Index = () => {
             {/* Step: Config */}
             {currentStep === "config" && (
               <div className="space-y-8">
-                <PodcastConfig 
-                  config={config} 
-                  onChange={setConfig}
-                  disabled={isGeneratingVariants}
-                />
+                <Tabs defaultValue="podcast" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsTrigger value="podcast">Podcast-Konfiguration</TabsTrigger>
+                    <TabsTrigger value="video">Video-Konfiguration</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="podcast">
+                    <PodcastConfig 
+                      config={config} 
+                      onChange={setConfig}
+                      disabled={isGeneratingVariants}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="video">
+                    <VideoConfig
+                      config={videoConfig}
+                      onChange={setVideoConfig}
+                      disabled={isGeneratingVariants}
+                    />
+                  </TabsContent>
+                </Tabs>
                 
                 {/* Duration Slider */}
                 <div className="space-y-3 pt-4 border-t border-border">
@@ -330,10 +439,10 @@ const Index = () => {
                   <>
                     <div className="text-center space-y-2">
                       <h2 className="text-2xl font-display font-bold text-foreground">
-                        Vertonung
+                        Audio erstellen
                       </h2>
                       <p className="text-muted-foreground">
-                        Wähle eine Stimme und erstelle deinen Podcast
+                        Wähle eine Stimme und erstelle das Audio
                       </p>
                     </div>
 
@@ -362,7 +471,7 @@ const Index = () => {
                           className="flex-1 h-14 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
                         >
                           <Volume2 className="h-5 w-5" />
-                          Podcast erstellen
+                          Audio erstellen
                         </Button>
                       </div>
                     )}
@@ -372,16 +481,114 @@ const Index = () => {
                     <div className="text-center space-y-2">
                       <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
                         <Sparkles className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium text-primary">Podcast fertig!</span>
+                        <span className="text-sm font-medium text-primary">Audio fertig!</span>
                       </div>
                     </div>
 
                     <AudioPlayer audioUrl={audioUrl} title="Mein Podcast" />
+
+                    <div className="flex gap-3">
+                      <Button variant="outline" onClick={handleBack} className="gap-2">
+                        <ArrowLeft className="h-4 w-4" />
+                        Zurück
+                      </Button>
+                      <Button
+                        onClick={handleContinueToVideo}
+                        className="flex-1 h-14 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
+                      >
+                        <Video className="h-5 w-5" />
+                        Weiter zu Video
+                        <ArrowRight className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step: Video */}
+            {currentStep === "video" && (
+              <div className="space-y-6">
+                {!videoUrl ? (
+                  <>
+                    <div className="text-center space-y-2">
+                      <h2 className="text-2xl font-display font-bold text-foreground">
+                        Video erstellen
+                      </h2>
+                      <p className="text-muted-foreground">
+                        Generiere ein Video mit zwei Sprechern
+                      </p>
+                    </div>
+
+                    {/* Video Config Summary */}
+                    <div className="space-y-4 p-4 rounded-xl bg-muted/30 border border-border">
+                      <h3 className="font-medium text-foreground">Video-Einstellungen</h3>
+                      <div className="grid gap-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Hintergrund:</span>
+                          <p className="text-foreground">{videoConfig.background || "Standard-Studio"}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Sprecher 1:</span>
+                          <p className="text-foreground">{videoConfig.character1 || "Automatisch generiert"}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Sprecher 2:</span>
+                          <p className="text-foreground">{videoConfig.character2 || "Automatisch generiert"}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {isGeneratingVideo ? (
+                      <div className="space-y-4 p-6 rounded-xl bg-secondary/50 border border-border">
+                        <div className="flex items-center justify-center gap-3">
+                          <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                          <span className="font-medium text-foreground">Video wird generiert...</span>
+                        </div>
+                        <p className="text-center text-sm text-muted-foreground">
+                          Status: {videoStatus}
+                        </p>
+                        <p className="text-center text-xs text-muted-foreground">
+                          Dies kann 1-3 Minuten dauern
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3">
+                        <Button variant="outline" onClick={handleBack} className="gap-2">
+                          <ArrowLeft className="h-4 w-4" />
+                          Zurück
+                        </Button>
+                        <Button
+                          onClick={handleGenerateVideo}
+                          className="flex-1 h-14 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
+                        >
+                          <Video className="h-5 w-5" />
+                          Video generieren
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-8">
+                    <div className="text-center space-y-2">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">Podcast komplett!</span>
+                      </div>
+                    </div>
+
+                    <VideoPlayer 
+                      videoUrl={videoUrl} 
+                      audioUrl={audioUrl}
+                      title="Mein Podcast Video"
+                      onRegenerate={handleGenerateVideo}
+                      isRegenerating={isGeneratingVideo}
+                    />
                     
                     {/* Script Display */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-foreground">Vollständiges Script</Label>
-                      <div className="p-4 rounded-xl bg-muted/30 border border-border max-h-64 overflow-y-auto">
+                      <div className="p-4 rounded-xl bg-muted/30 border border-border max-h-48 overflow-y-auto">
                         <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap font-mono">
                           {finalScript}
                         </p>
@@ -406,7 +613,7 @@ const Index = () => {
 
         {/* Footer */}
         <footer className="mt-12 text-center text-sm text-muted-foreground">
-          <p>Powered by AI • Deine Stimme, dein Inhalt</p>
+          <p>Powered by AI • Text, Audio & Video</p>
         </footer>
       </div>
     </div>
