@@ -14,7 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      podcast_configurations: {
+        Row: {
+          audio_url: string | null
+          character1: string | null
+          character2: string | null
+          created_at: string
+          id: string
+          name: string
+          podcast_structure: string | null
+          script: string | null
+          speaker_background: string | null
+          text_style: string | null
+          topics: string
+          user_id: string
+          video_background: string | null
+          video_url: string | null
+          voice_id: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          character1?: string | null
+          character2?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          podcast_structure?: string | null
+          script?: string | null
+          speaker_background?: string | null
+          text_style?: string | null
+          topics: string
+          user_id: string
+          video_background?: string | null
+          video_url?: string | null
+          voice_id?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          character1?: string | null
+          character2?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          podcast_structure?: string | null
+          script?: string | null
+          speaker_background?: string | null
+          text_style?: string | null
+          topics?: string
+          user_id?: string
+          video_background?: string | null
+          video_url?: string | null
+          voice_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          default_background: string | null
+          default_character1: string | null
+          default_character2: string | null
+          default_voice_id: string | null
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_background?: string | null
+          default_character1?: string | null
+          default_character2?: string | null
+          default_voice_id?: string | null
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_background?: string | null
+          default_character1?: string | null
+          default_character2?: string | null
+          default_voice_id?: string | null
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
