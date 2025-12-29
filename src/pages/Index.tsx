@@ -8,13 +8,18 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { VoiceSelector } from "@/components/VoiceSelector";
 import { GenerationStatus } from "@/components/GenerationStatus";
+import { SavedConfigurations } from "@/components/SavedConfigurations";
+import { UserMenu } from "@/components/UserMenu";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2 } from "lucide-react";
+import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import type { User } from "@supabase/supabase-js";
 
 interface ScriptVariant {
   id: number;
@@ -24,6 +29,12 @@ interface ScriptVariant {
 const Index = () => {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("config");
   const [completedSteps, setCompletedSteps] = useState<WorkflowStep[]>([]);
+  
+  // User state
+  const [user, setUser] = useState<User | null>(null);
+  const [showSavedDialog, setShowSavedDialog] = useState(false);
+  const [saveConfigName, setSaveConfigName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   
   // Config state
   const [config, setConfig] = useState<PodcastConfigData>({
@@ -61,6 +72,19 @@ const Index = () => {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   
   const { toast } = useToast();
+
+  // Auth state
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Poll video generation status
   useEffect(() => {
@@ -277,6 +301,75 @@ const Index = () => {
     setVideoStatus("");
   };
 
+  const handleSaveConfiguration = async () => {
+    if (!user || !saveConfigName.trim()) {
+      toast({
+        title: "Name erforderlich",
+        description: "Bitte gib einen Namen für die Konfiguration ein.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from("podcast_configurations").insert({
+        user_id: user.id,
+        name: saveConfigName.trim(),
+        topics: config.topics,
+        speaker_background: config.speakerBackground,
+        podcast_structure: config.podcastStructure,
+        text_style: config.textStyle,
+        voice_id: voiceId,
+        video_background: videoConfig.background,
+        character1: videoConfig.character1,
+        character2: videoConfig.character2,
+        script: finalScript || null,
+        audio_url: null,
+        video_url: videoUrl || null
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Gespeichert!",
+        description: "Deine Konfiguration wurde gespeichert."
+      });
+      setSaveConfigName("");
+    } catch (error) {
+      console.error("Save error:", error);
+      toast({
+        title: "Fehler",
+        description: "Speichern fehlgeschlagen",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadConfiguration = (savedConfig: any) => {
+    setConfig({
+      speakerBackground: savedConfig.speaker_background || "",
+      podcastStructure: savedConfig.podcast_structure || "",
+      textStyle: savedConfig.text_style || "",
+      topics: savedConfig.topics || ""
+    });
+    setVideoConfig({
+      background: savedConfig.video_background || "",
+      character1: savedConfig.character1 || "",
+      character2: savedConfig.character2 || ""
+    });
+    if (savedConfig.voice_id) setVoiceId(savedConfig.voice_id);
+    if (savedConfig.script) setFinalScript(savedConfig.script);
+    setShowSavedDialog(false);
+    
+    toast({
+      title: "Geladen!",
+      description: "Konfiguration wurde geladen."
+    });
+  };
+
   const handleBack = () => {
     const steps: WorkflowStep[] = ["config", "variants", "optimize", "audio", "video"];
     const currentIndex = steps.indexOf(currentStep);
@@ -297,18 +390,43 @@ const Index = () => {
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
         {/* Header */}
-        <header className="text-center mb-8 animate-fade-in">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-              <Podcast className="h-8 w-8 text-primary" />
+        <header className="mb-8 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+                <Podcast className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-display font-bold">
+                  <span className="text-gradient">PodcastAI</span>
+                </h1>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Professionelle Podcasts mit Video
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {user && (
+                <>
+                  <Dialog open={showSavedDialog} onOpenChange={setShowSavedDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <FolderOpen className="w-4 h-4 mr-2" />
+                        Gespeichert
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Gespeicherte Konfigurationen</DialogTitle>
+                      </DialogHeader>
+                      <SavedConfigurations onLoad={handleLoadConfiguration} />
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
+              <UserMenu />
             </div>
           </div>
-          <h1 className="text-3xl md:text-5xl font-display font-bold mb-2">
-            <span className="text-gradient">PodcastAI</span>
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">
-            Professionelle Podcasts mit Video erstellen
-          </p>
         </header>
 
         {/* Workflow Stepper */}
@@ -595,6 +713,30 @@ const Index = () => {
                       </div>
                     </div>
 
+                    <div className="flex gap-3">
+                      {user && (
+                        <div className="flex gap-2 flex-1">
+                          <Input
+                            placeholder="Name der Konfiguration..."
+                            value={saveConfigName}
+                            onChange={(e) => setSaveConfigName(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={handleSaveConfiguration}
+                            disabled={isSaving || !saveConfigName.trim()}
+                            className="gap-2"
+                          >
+                            {isSaving ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4" />
+                            )}
+                            Speichern
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                     <Button
                       onClick={handleReset}
                       variant="outline"
