@@ -116,23 +116,34 @@ export const ScriptOptimizer = ({
       {/* Action buttons */}
       <div className="flex flex-col sm:flex-row gap-3">
         {!isOptimized ? (
-          <Button
-            onClick={onOptimize}
-            disabled={isOptimizing}
-            className="flex-1 h-12 gap-2 bg-accent hover:bg-accent/90 text-accent-foreground glow-accent"
-          >
-            {isOptimizing ? (
-              <>
-                <Sparkles className="h-4 w-4 animate-pulse" />
-                Optimiere Script...
-              </>
-            ) : (
-              <>
-                <Wand2 className="h-4 w-4" />
-                Script optimieren
-              </>
-            )}
-          </Button>
+          <>
+            <Button
+              onClick={onOptimize}
+              disabled={isOptimizing}
+              className="flex-1 h-12 gap-2 bg-accent hover:bg-accent/90 text-accent-foreground glow-accent"
+            >
+              {isOptimizing ? (
+                <>
+                  <Sparkles className="h-4 w-4 animate-pulse" />
+                  Optimiere Script...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4" />
+                  Script optimieren
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleAccept}
+              disabled={isOptimizing}
+              variant="outline"
+              className="flex-1 h-12 gap-2"
+            >
+              <Check className="h-4 w-4" />
+              Überspringen
+            </Button>
+          </>
         ) : (
           <>
             <Button
