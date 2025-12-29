@@ -50,21 +50,58 @@ serve(async (req) => {
     const videoPrompt = buildVideoPrompt(prompt, background, character1, character2);
     console.log("Generated video prompt:", videoPrompt);
 
-    // Use Stable Video Diffusion or similar model for video generation
-    // Starting with image generation, then animate
-    const prediction = await replicate.predictions.create({
-      model: "stability-ai/stable-video-diffusion",
-      input: {
-        input_image: await generateBaseImage(replicate, videoPrompt),
-        motion_bucket_id: 127,
-        fps: 6,
-        cond_aug: 0.02,
-        decoding_t: 7,
-        video_length: "14_frames_with_svd",
-        sizing_strategy: "maintain_aspect_ratio",
-        frames_per_second: 6
+    // Generate base image first
+    let baseImageUrl: string;
+    try {
+      baseImageUrl = await generateBaseImage(replicate, videoPrompt);
+    } catch (imgError: any) {
+      console.error("Base image generation failed:", imgError);
+      if (imgError.response?.status === 429) {
+        const retryAfter = imgError.response?.headers?.get("retry-after") || 10;
+        return new Response(
+          JSON.stringify({ 
+            error: `Rate limit erreicht. Bitte warte ${retryAfter} Sekunden und versuche es erneut.`,
+            retryAfter: parseInt(retryAfter),
+            isRateLimit: true
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+        );
       }
-    });
+      throw imgError;
+    }
+
+    // Create video prediction with retry logic
+    let prediction;
+    try {
+      prediction = await replicate.predictions.create({
+        model: "stability-ai/stable-video-diffusion",
+        input: {
+          input_image: baseImageUrl,
+          motion_bucket_id: 127,
+          fps: 6,
+          cond_aug: 0.02,
+          decoding_t: 7,
+          video_length: "14_frames_with_svd",
+          sizing_strategy: "maintain_aspect_ratio",
+          frames_per_second: 6
+        }
+      });
+    } catch (vidError: any) {
+      console.error("Video prediction creation failed:", vidError);
+      if (vidError.response?.status === 429 || vidError.message?.includes("429")) {
+        const retryAfter = vidError.response?.headers?.get("retry-after") || 10;
+        return new Response(
+          JSON.stringify({ 
+            error: `Rate limit erreicht. Dein Replicate-Guthaben ist niedrig. Bitte warte ${retryAfter} Sekunden oder lade Guthaben auf replicate.com auf.`,
+            retryAfter: parseInt(retryAfter),
+            isRateLimit: true,
+            baseImageUrl // Return the base image so we can retry without regenerating
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+        );
+      }
+      throw vidError;
+    }
 
     console.log("Started video generation:", prediction.id);
 
@@ -72,7 +109,8 @@ serve(async (req) => {
       JSON.stringify({ 
         predictionId: prediction.id,
         status: prediction.status,
-        message: "Video generation started"
+        message: "Video generation started",
+        baseImageUrl
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
