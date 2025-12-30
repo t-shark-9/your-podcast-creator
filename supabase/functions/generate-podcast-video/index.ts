@@ -94,21 +94,26 @@ serve(async (req) => {
       }
     }
 
-    // Create video prediction with retry logic
+    // Create video prediction - try image-to-video with SVD
     let prediction;
     try {
-      // Use the proper model identifier format for Replicate
+      console.log("Creating video from base image:", baseImageUrl);
+      
+      // Use stable-video-diffusion img2vid-xt for longer videos
       prediction = await replicate.predictions.create({
-        version: "dc2c25ec2c1fbce04be032d67a2f8c6c5e08b041b94f9b655c631a067e4cef13",
+        version: "3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
         input: {
           input_image: baseImageUrl,
+          sizing_strategy: "maintain_aspect_ratio",
+          frames_per_second: 6,
           motion_bucket_id: 127,
-          fps: 7,
           cond_aug: 0.02,
           decoding_t: 14,
           seed: Math.floor(Math.random() * 1000000)
         }
       });
+      
+      console.log("Video prediction created:", prediction.id, prediction.status);
     } catch (vidError: any) {
       console.error("Video prediction creation failed:", vidError);
       console.error("Error details:", JSON.stringify(vidError, null, 2));
