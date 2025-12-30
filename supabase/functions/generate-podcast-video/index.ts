@@ -56,7 +56,13 @@ serve(async (req) => {
       baseImageUrl = await generateBaseImage(replicate, videoPrompt);
     } catch (imgError: any) {
       console.error("Base image generation failed:", imgError);
-      if (imgError.response?.status === 429) {
+      console.error("Error details:", JSON.stringify(imgError, null, 2));
+      
+      const status = imgError.response?.status || imgError.status;
+      const errorMessage = imgError.message?.toLowerCase() || "";
+      
+      // Check for rate limit errors
+      if (status === 429 || errorMessage.includes("rate limit") || errorMessage.includes("too many requests")) {
         const retryAfter = imgError.response?.headers?.get("retry-after") || 10;
         return new Response(
           JSON.stringify({ 
@@ -65,6 +71,18 @@ serve(async (req) => {
             isRateLimit: true
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+        );
+      }
+      
+      // Check for payment/billing errors
+      if (status === 402 || errorMessage.includes("payment") || errorMessage.includes("billing") || 
+          errorMessage.includes("credit") || errorMessage.includes("subscription")) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Replicate-Guthaben aufgebraucht. Bitte lade Guthaben auf replicate.com auf.`,
+            isPaymentRequired: true
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 }
         );
       }
       throw imgError;
@@ -88,11 +106,36 @@ serve(async (req) => {
       });
     } catch (vidError: any) {
       console.error("Video prediction creation failed:", vidError);
-      if (vidError.response?.status === 429 || vidError.message?.includes("429")) {
+      console.error("Error details:", JSON.stringify(vidError, null, 2));
+      
+      const status = vidError.response?.status || vidError.status;
+      const errorMessage = vidError.message?.toLowerCase() || "";
+      
+      // Check for payment/billing errors first (they're more specific)
+      const isPaymentRequired = status === 402 || errorMessage.includes("payment") || 
+          errorMessage.includes("billing") || errorMessage.includes("credit") || 
+          errorMessage.includes("subscription") || errorMessage.includes("402");
+      
+      if (isPaymentRequired) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Replicate-Guthaben aufgebraucht. Bitte lade Guthaben auf replicate.com auf.`,
+            isPaymentRequired: true,
+            baseImageUrl
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 }
+        );
+      }
+      
+      // Check for rate limit errors
+      const isRateLimit = status === 429 || errorMessage.includes("rate limit") || 
+          errorMessage.includes("too many requests") || errorMessage.includes("429");
+      
+      if (isRateLimit) {
         const retryAfter = vidError.response?.headers?.get("retry-after") || 10;
         return new Response(
           JSON.stringify({ 
-            error: `Rate limit erreicht. Dein Replicate-Guthaben ist niedrig. Bitte warte ${retryAfter} Sekunden oder lade Guthaben auf replicate.com auf.`,
+            error: `Rate limit erreicht. Bitte warte ${retryAfter} Sekunden und versuche es erneut.`,
             retryAfter: parseInt(retryAfter),
             isRateLimit: true,
             baseImageUrl // Return the base image so we can retry without regenerating

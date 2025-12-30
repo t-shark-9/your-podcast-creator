@@ -80,6 +80,15 @@ Antworte NUR mit dem JSON-Array, kein anderer Text.`;
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
       
+      // Try to parse error details from the response
+      let errorDetails = "";
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetails = errorJson.error?.message || errorJson.message || errorText;
+      } catch {
+        errorDetails = errorText;
+      }
+      
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
           status: 429,
@@ -87,12 +96,12 @@ Antworte NUR mit dem JSON-Array, kein anderer Text.`;
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required. Please add credits to continue." }), {
+        return new Response(JSON.stringify({ error: `Payment required: ${errorDetails || "Please check your Lovable credits."}` }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`AI gateway error: ${response.status} - ${errorDetails}`);
     }
 
     const data = await response.json();
