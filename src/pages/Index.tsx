@@ -268,11 +268,15 @@ const Index = () => {
         }
       });
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        const errorMsg = typeof error === 'string' ? error : (error.message || 'Unknown error');
+        throw new Error(errorMsg);
+      }
       
       // Handle rate limit with automatic retry
       if (data?.isRateLimit && data?.retryAfter) {
         const retrySeconds = data.retryAfter || 10;
+        const baseImage = data.baseImageUrl;
         toast({
           title: "Rate Limit - Automatischer Retry",
           description: `Warte ${retrySeconds} Sekunden und versuche erneut...`
@@ -280,7 +284,7 @@ const Index = () => {
         
         // Retry after the specified delay, using the base image if available
         setTimeout(() => {
-          handleGenerateVideo(data.baseImageUrl);
+          handleGenerateVideo(baseImage);
         }, retrySeconds * 1000);
         return;
       }
