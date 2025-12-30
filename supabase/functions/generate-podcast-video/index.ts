@@ -97,17 +97,16 @@ serve(async (req) => {
     // Create video prediction with retry logic
     let prediction;
     try {
+      // Use the proper model identifier format for Replicate
       prediction = await replicate.predictions.create({
-        model: "stability-ai/stable-video-diffusion",
+        version: "dc2c25ec2c1fbce04be032d67a2f8c6c5e08b041b94f9b655c631a067e4cef13",
         input: {
           input_image: baseImageUrl,
           motion_bucket_id: 127,
-          fps: 6,
+          fps: 7,
           cond_aug: 0.02,
-          decoding_t: 7,
-          video_length: "14_frames_with_svd",
-          sizing_strategy: "maintain_aspect_ratio",
-          frames_per_second: 6
+          decoding_t: 14,
+          seed: Math.floor(Math.random() * 1000000)
         }
       });
     } catch (vidError: any) {

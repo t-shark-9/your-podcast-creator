@@ -224,14 +224,27 @@ const QuickCreate = () => {
         body: { predictionId }
       });
 
-      if (error) continue;
+      if (error) {
+        console.log("Poll error:", error);
+        continue;
+      }
+
+      console.log("Poll response:", data);
 
       if (data?.status === "succeeded" && data?.output) {
-        return Array.isArray(data.output) ? data.output[0] : data.output;
+        const outputUrl = Array.isArray(data.output) ? data.output[0] : data.output;
+        console.log("Video URL:", outputUrl);
+        // Check if it's actually a video (mp4) not an image
+        if (outputUrl && (outputUrl.includes(".mp4") || outputUrl.includes("video"))) {
+          return outputUrl;
+        }
+        // If it looks like an image, still return it for now
+        return outputUrl;
       }
       
       if (data?.status === "failed") {
-        throw new Error("Video generation failed");
+        console.error("Video generation failed:", data);
+        throw new Error(data?.error || "Video generation failed");
       }
     }
     return null;
