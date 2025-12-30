@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw, Download, Volume2 } from "lucide-react";
@@ -9,7 +9,7 @@ interface AudioPlayerProps {
   title?: string;
 }
 
-export const AudioPlayer = ({ audioUrl, title }: AudioPlayerProps) => {
+export const AudioPlayer = React.forwardRef<HTMLDivElement, AudioPlayerProps>(({ audioUrl, title }, ref) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -82,7 +82,7 @@ export const AudioPlayer = ({ audioUrl, title }: AudioPlayerProps) => {
   };
 
   return (
-    <div className="w-full space-y-6 animate-fade-in">
+    <div ref={ref} className="w-full space-y-6 animate-fade-in">
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
       
       {/* Waveform */}
@@ -151,4 +151,6 @@ export const AudioPlayer = ({ audioUrl, title }: AudioPlayerProps) => {
       </div>
     </div>
   );
-};
+});
+
+AudioPlayer.displayName = "AudioPlayer";
