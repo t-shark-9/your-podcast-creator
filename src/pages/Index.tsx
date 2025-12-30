@@ -249,11 +249,13 @@ const Index = () => {
     setCurrentStep("video");
   };
 
-  const handleGenerateVideo = async () => {
+  const handleGenerateVideo = async (retryWithBaseImage?: string) => {
     setIsGeneratingVideo(true);
     setVideoStatus("starting");
     setVideoUrl("");
-    setVideoPredictionId(null);
+    if (!retryWithBaseImage) {
+      setVideoPredictionId(null);
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-podcast-video", {
@@ -261,11 +263,28 @@ const Index = () => {
           prompt: config.topics.slice(0, 200),
           background: videoConfig.background,
           character1: videoConfig.character1,
-          character2: videoConfig.character2
+          character2: videoConfig.character2,
+          ...(retryWithBaseImage && { existingBaseImage: retryWithBaseImage })
         }
       });
 
       if (error) throw new Error(error.message);
+      
+      // Handle rate limit with automatic retry
+      if (data?.isRateLimit && data?.retryAfter) {
+        const retrySeconds = data.retryAfter || 10;
+        toast({
+          title: "Rate Limit - Automatischer Retry",
+          description: `Warte ${retrySeconds} Sekunden und versuche erneut...`
+        });
+        
+        // Retry after the specified delay, using the base image if available
+        setTimeout(() => {
+          handleGenerateVideo(data.baseImageUrl);
+        }, retrySeconds * 1000);
+        return;
+      }
+      
       if (data?.error) throw new Error(data.error);
       if (!data?.predictionId) throw new Error("Video-Generierung konnte nicht gestartet werden");
 

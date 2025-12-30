@@ -26,7 +26,8 @@ serve(async (req) => {
       character1, 
       character2, 
       audioUrl,
-      duration = 5 
+      duration = 5,
+      existingBaseImage
     } = body;
 
     // Check status of existing prediction
@@ -50,42 +51,47 @@ serve(async (req) => {
     const videoPrompt = buildVideoPrompt(prompt, background, character1, character2);
     console.log("Generated video prompt:", videoPrompt);
 
-    // Generate base image first
+    // Use existing base image if provided (for retries), otherwise generate new one
     let baseImageUrl: string;
-    try {
-      baseImageUrl = await generateBaseImage(replicate, videoPrompt);
-    } catch (imgError: any) {
-      console.error("Base image generation failed:", imgError);
-      console.error("Error details:", JSON.stringify(imgError, null, 2));
+    if (existingBaseImage) {
+      console.log("Using existing base image from previous attempt:", existingBaseImage);
+      baseImageUrl = existingBaseImage;
+    } else {
+      try {
+        baseImageUrl = await generateBaseImage(replicate, videoPrompt);
+      } catch (imgError: any) {
+        console.error("Base image generation failed:", imgError);
+        console.error("Error details:", JSON.stringify(imgError, null, 2));
+        
+        const status = imgError.response?.status || imgError.status;
+        const errorMessage = imgError.message?.toLowerCase() || "";
       
-      const status = imgError.response?.status || imgError.status;
-      const errorMessage = imgError.message?.toLowerCase() || "";
-      
-      // Check for rate limit errors
-      if (status === 429 || errorMessage.includes("rate limit") || errorMessage.includes("too many requests")) {
-        const retryAfter = imgError.response?.headers?.get("retry-after") || 10;
-        return new Response(
-          JSON.stringify({ 
-            error: `Rate limit erreicht. Bitte warte ${retryAfter} Sekunden und versuche es erneut.`,
-            retryAfter: parseInt(retryAfter),
-            isRateLimit: true
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
-        );
+        // Check for rate limit errors
+        if (status === 429 || errorMessage.includes("rate limit") || errorMessage.includes("too many requests")) {
+          const retryAfter = imgError.response?.headers?.get("retry-after") || 10;
+          return new Response(
+            JSON.stringify({ 
+              error: `Rate limit erreicht. Bitte warte ${retryAfter} Sekunden und versuche es erneut.`,
+              retryAfter: parseInt(retryAfter),
+              isRateLimit: true
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+          );
+        }
+        
+        // Check for payment/billing errors
+        if (status === 402 || errorMessage.includes("payment") || errorMessage.includes("billing") || 
+            errorMessage.includes("credit") || errorMessage.includes("subscription")) {
+          return new Response(
+            JSON.stringify({ 
+              error: `Replicate-Guthaben aufgebraucht. Bitte lade Guthaben auf replicate.com auf.`,
+              isPaymentRequired: true
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 }
+          );
+        }
+        throw imgError;
       }
-      
-      // Check for payment/billing errors
-      if (status === 402 || errorMessage.includes("payment") || errorMessage.includes("billing") || 
-          errorMessage.includes("credit") || errorMessage.includes("subscription")) {
-        return new Response(
-          JSON.stringify({ 
-            error: `Replicate-Guthaben aufgebraucht. Bitte lade Guthaben auf replicate.com auf.`,
-            isPaymentRequired: true
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 }
-        );
-      }
-      throw imgError;
     }
 
     // Create video prediction with retry logic
