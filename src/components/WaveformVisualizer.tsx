@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface WaveformVisualizerProps {
   isPlaying?: boolean;
@@ -6,11 +6,11 @@ interface WaveformVisualizerProps {
   audioUrl?: string;
 }
 
-export const WaveformVisualizer = ({ 
+export const WaveformVisualizer = React.forwardRef<HTMLDivElement, WaveformVisualizerProps>(({ 
   isPlaying = false, 
   isGenerating = false,
   audioUrl 
-}: WaveformVisualizerProps) => {
+}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -94,7 +94,7 @@ export const WaveformVisualizer = ({
   }, [isPlaying, isGenerating]);
 
   return (
-    <div className="relative w-full">
+    <div ref={ref} className="relative w-full">
       <canvas 
         ref={canvasRef} 
         width={800} 
@@ -104,4 +104,6 @@ export const WaveformVisualizer = ({
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none rounded-lg" />
     </div>
   );
-};
+});
+
+WaveformVisualizer.displayName = "WaveformVisualizer";
