@@ -137,6 +137,8 @@ export const VideoPlayer = ({
           className="w-full h-full object-contain"
           playsInline
           loop
+          muted={!!audioUrl}
+          autoPlay
         />
         
         {/* Hidden audio for synchronized playback */}

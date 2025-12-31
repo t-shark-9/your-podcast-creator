@@ -94,22 +94,18 @@ serve(async (req) => {
       }
     }
 
-    // Create video prediction - try image-to-video with SVD
+    // Create video prediction using Kling for longer ~10 second videos
     let prediction;
     try {
       console.log("Creating video from base image:", baseImageUrl);
       
-      // Use stable-video-diffusion img2vid-xt for longer videos
+      // Use minimax/video-01 for 5-6 second videos that can loop well
       prediction = await replicate.predictions.create({
-        version: "3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
+        version: "c8bcc4751328608bb5ac1a3dfdeee2589e82e5b667b469ce8801f2a30c415349",
         input: {
-          input_image: baseImageUrl,
-          sizing_strategy: "maintain_aspect_ratio",
-          frames_per_second: 6,
-          motion_bucket_id: 127,
-          cond_aug: 0.02,
-          decoding_t: 14,
-          seed: Math.floor(Math.random() * 1000000)
+          prompt: "subtle natural movement, gentle motion, slight head movement, blinking, breathing, ambient motion, seamless loop",
+          first_frame_image: baseImageUrl,
+          prompt_optimizer: true
         }
       });
       
