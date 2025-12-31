@@ -700,7 +700,7 @@ const Index = () => {
                           Zurück
                         </Button>
                         <Button
-                          onClick={handleGenerateVideo}
+                          onClick={() => handleGenerateVideo()}
                           className="flex-1 h-14 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
                         >
                           <Video className="h-5 w-5" />
@@ -722,7 +722,7 @@ const Index = () => {
                       videoUrl={videoUrl} 
                       audioUrl={audioUrl}
                       title="Mein Podcast Video"
-                      onRegenerate={handleGenerateVideo}
+                      onRegenerate={() => handleGenerateVideo()}
                       isRegenerating={isGeneratingVideo}
                     />
                     
