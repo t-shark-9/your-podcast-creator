@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Volume2, VolumeX, Maximize, Download, RefreshCw } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Download, RefreshCw, ImageIcon } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
 interface VideoPlayerProps {
@@ -25,10 +25,45 @@ export const VideoPlayer = ({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [isImage, setIsImage] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
+
+  // Detect if URL is an image instead of video
+  useEffect(() => {
+    const checkMediaType = async () => {
+      try {
+        // Check file extension first
+        const url = videoUrl.toLowerCase();
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
+        const isImageByExtension = imageExtensions.some(ext => url.includes(ext));
+        
+        if (isImageByExtension) {
+          console.log("Detected image by extension:", videoUrl);
+          setIsImage(true);
+          return;
+        }
+
+        // If no clear extension, try to load as video and fallback to image on error
+        setIsImage(false);
+        setMediaError(false);
+      } catch (error) {
+        console.error("Error checking media type:", error);
+      }
+    };
+
+    checkMediaType();
+  }, [videoUrl]);
+
+  // Handle video error - fallback to image display
+  const handleVideoError = () => {
+    console.log("Video failed to load, falling back to image display:", videoUrl);
+    setMediaError(true);
+    setIsImage(true);
+  };
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isImage) return;
 
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
     const handleLoadedMetadata = () => setDuration(video.duration);
@@ -43,13 +78,33 @@ export const VideoPlayer = ({
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [videoUrl]);
+  }, [videoUrl, isImage]);
 
-  // Sync audio with video if both exist
+  // Handle audio for image mode
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
+
+    const handleAudioTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleAudioLoadedMetadata = () => setDuration(audio.duration);
+    const handleAudioEnded = () => setIsPlaying(false);
+
+    audio.addEventListener("timeupdate", handleAudioTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleAudioLoadedMetadata);
+    audio.addEventListener("ended", handleAudioEnded);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleAudioTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleAudioLoadedMetadata);
+      audio.removeEventListener("ended", handleAudioEnded);
+    };
+  }, [audioUrl, isImage]);
+
+  // Sync audio with video if both exist (video mode only)
   useEffect(() => {
     const video = videoRef.current;
     const audio = audioRef.current;
-    if (!video || !audio || !audioUrl) return;
+    if (!video || !audio || !audioUrl || isImage) return;
 
     const syncAudio = () => {
       if (Math.abs(audio.currentTime - video.currentTime) > 0.3) {
@@ -59,65 +114,93 @@ export const VideoPlayer = ({
 
     video.addEventListener("timeupdate", syncAudio);
     return () => video.removeEventListener("timeupdate", syncAudio);
-  }, [audioUrl]);
+  }, [audioUrl, isImage]);
 
   const togglePlay = () => {
-    const video = videoRef.current;
-    const audio = audioRef.current;
-    if (!video) return;
+    if (isImage) {
+      // Image mode - only control audio
+      const audio = audioRef.current;
+      if (!audio) return;
 
-    if (isPlaying) {
-      video.pause();
-      audio?.pause();
+      if (isPlaying) {
+        audio.pause();
+      } else {
+        audio.play();
+      }
+      setIsPlaying(!isPlaying);
     } else {
-      video.play();
-      audio?.play();
+      // Video mode
+      const video = videoRef.current;
+      const audio = audioRef.current;
+      if (!video) return;
+
+      if (isPlaying) {
+        video.pause();
+        audio?.pause();
+      } else {
+        video.play();
+        audio?.play();
+      }
+      setIsPlaying(!isPlaying);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (value: number[]) => {
-    const video = videoRef.current;
-    const audio = audioRef.current;
-    if (!video) return;
-
     const time = value[0];
-    video.currentTime = time;
-    if (audio) audio.currentTime = time;
-    setCurrentTime(time);
+    
+    if (isImage) {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = time;
+        setCurrentTime(time);
+      }
+    } else {
+      const video = videoRef.current;
+      const audio = audioRef.current;
+      if (!video) return;
+
+      video.currentTime = time;
+      if (audio) audio.currentTime = time;
+      setCurrentTime(time);
+    }
   };
 
   const toggleMute = () => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!video) return;
+    const video = videoRef.current;
 
     const newMuted = !isMuted;
-    video.muted = newMuted;
+    
+    if (video && !isImage) video.muted = newMuted;
     if (audio) audio.muted = newMuted;
     setIsMuted(newMuted);
   };
 
   const handleVolumeChange = (value: number[]) => {
-    const video = videoRef.current;
-    const audio = audioRef.current;
-    if (!video) return;
-
     const vol = value[0];
-    video.volume = vol;
+    const audio = audioRef.current;
+    const video = videoRef.current;
+
+    if (video && !isImage) video.volume = vol;
     if (audio) audio.volume = vol;
     setVolume(vol);
     setIsMuted(vol === 0);
   };
 
   const handleFullscreen = () => {
-    videoRef.current?.requestFullscreen();
+    if (isImage) {
+      // For images, fullscreen the container
+      const container = document.querySelector('.video-container');
+      container?.requestFullscreen();
+    } else {
+      videoRef.current?.requestFullscreen();
+    }
   };
 
   const handleDownload = () => {
     const a = document.createElement("a");
     a.href = videoUrl;
-    a.download = `${title}.mp4`;
+    a.download = isImage ? `${title}.png` : `${title}.mp4`;
     a.click();
   };
 
@@ -129,21 +212,39 @@ export const VideoPlayer = ({
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Video Container */}
-      <div className="relative rounded-2xl overflow-hidden bg-black aspect-video">
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          className="w-full h-full object-contain"
-          playsInline
-          loop
-          muted={!!audioUrl}
-          autoPlay
-        />
+      {/* Media Container */}
+      <div className="video-container relative rounded-2xl overflow-hidden bg-black aspect-video">
+        {isImage ? (
+          // Image fallback display
+          <>
+            <img
+              src={videoUrl}
+              alt={title}
+              className="w-full h-full object-contain"
+            />
+            {/* Image mode indicator */}
+            <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/90 text-white text-xs font-medium">
+              <ImageIcon className="h-3 w-3" />
+              Bild-Modus (Video-Generierung fehlgeschlagen)
+            </div>
+          </>
+        ) : (
+          // Video display
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            className="w-full h-full object-contain"
+            playsInline
+            loop
+            muted={!!audioUrl}
+            autoPlay
+            onError={handleVideoError}
+          />
+        )}
         
-        {/* Hidden audio for synchronized playback */}
+        {/* Audio element for both modes */}
         {audioUrl && (
-          <audio ref={audioRef} src={audioUrl} />
+          <audio ref={audioRef} src={audioUrl} loop={isImage} />
         )}
 
         {/* Play overlay */}
