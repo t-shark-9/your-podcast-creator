@@ -10,9 +10,11 @@ import { VoiceSelector } from "@/components/VoiceSelector";
 import { GenerationStatus } from "@/components/GenerationStatus";
 import { SavedConfigurations } from "@/components/SavedConfigurations";
 import { UserMenu } from "@/components/UserMenu";
+import { ModeSelection } from "@/components/ModeSelection";
+import { SimplePodcastWorkflow } from "@/components/SimplePodcastWorkflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen } from "lucide-react";
+import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -26,7 +28,10 @@ interface ScriptVariant {
   content: string;
 }
 
+type AppMode = "selection" | "simple" | "rigorous";
+
 const Index = () => {
+  const [appMode, setAppMode] = useState<AppMode>("selection");
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("config");
   const [completedSteps, setCompletedSteps] = useState<WorkflowStep[]>([]);
   
@@ -85,6 +90,33 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Mode selection handlers
+  const handleSelectMode = (mode: "simple" | "rigorous") => {
+    setAppMode(mode);
+  };
+
+  const handleSwitchToRigorous = () => {
+    setAppMode("rigorous");
+  };
+
+  const handleSwitchToSimple = () => {
+    setAppMode("simple");
+  };
+
+  const handleBackToSelection = () => {
+    setAppMode("selection");
+  };
+
+  // Show mode selection screen
+  if (appMode === "selection") {
+    return <ModeSelection onSelectMode={handleSelectMode} />;
+  }
+
+  // Show simple workflow
+  if (appMode === "simple") {
+    return <SimplePodcastWorkflow onSwitchMode={handleSwitchToRigorous} />;
+  }
 
   // Poll video generation status
   useEffect(() => {
@@ -429,6 +461,10 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleSwitchToSimple} className="gap-2">
+                <Zap className="w-4 h-4" />
+                Einfacher Modus
+              </Button>
               {user && (
                 <>
                   <Dialog open={showSavedDialog} onOpenChange={setShowSavedDialog}>
