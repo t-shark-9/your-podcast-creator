@@ -91,36 +91,9 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Mode selection handlers
-  const handleSelectMode = (mode: "simple" | "rigorous") => {
-    setAppMode(mode);
-  };
-
-  const handleSwitchToRigorous = () => {
-    setAppMode("rigorous");
-  };
-
-  const handleSwitchToSimple = () => {
-    setAppMode("simple");
-  };
-
-  const handleBackToSelection = () => {
-    setAppMode("selection");
-  };
-
-  // Show mode selection screen
-  if (appMode === "selection") {
-    return <ModeSelection onSelectMode={handleSelectMode} />;
-  }
-
-  // Show simple workflow
-  if (appMode === "simple") {
-    return <SimplePodcastWorkflow onSwitchMode={handleSwitchToRigorous} />;
-  }
-
-  // Poll video generation status
+  // Poll video generation status - must be before any conditional returns
   useEffect(() => {
-    if (!videoPredictionId || videoUrl) return;
+    if (!videoPredictionId || videoUrl || appMode !== "rigorous") return;
 
     const pollStatus = async () => {
       try {
@@ -151,7 +124,34 @@ const Index = () => {
 
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [videoPredictionId, videoUrl, toast]);
+  }, [videoPredictionId, videoUrl, toast, appMode]);
+
+  // Mode selection handlers
+  const handleSelectMode = (mode: "simple" | "rigorous") => {
+    setAppMode(mode);
+  };
+
+  const handleSwitchToRigorous = () => {
+    setAppMode("rigorous");
+  };
+
+  const handleSwitchToSimple = () => {
+    setAppMode("simple");
+  };
+
+  const handleBackToSelection = () => {
+    setAppMode("selection");
+  };
+
+  // Show mode selection screen
+  if (appMode === "selection") {
+    return <ModeSelection onSelectMode={handleSelectMode} />;
+  }
+
+  // Show simple workflow
+  if (appMode === "simple") {
+    return <SimplePodcastWorkflow onSwitchMode={handleSwitchToRigorous} />;
+  }
 
   const handleGenerateVariants = async () => {
     if (!config.topics.trim()) {
