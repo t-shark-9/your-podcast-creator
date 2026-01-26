@@ -3,9 +3,10 @@ import { VoiceSelector } from "@/components/VoiceSelector";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { GenerationStatus } from "@/components/GenerationStatus";
+import { VisualOutputSelector, type VisualOutputType } from "@/components/VisualOutputSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Settings2 } from "lucide-react";
+import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Settings2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -15,7 +16,7 @@ interface SimplePodcastWorkflowProps {
   onSwitchMode: () => void;
 }
 
-type SimpleStep = "input" | "generating" | "audio" | "video" | "complete";
+type SimpleStep = "input" | "generating" | "audio" | "visualChoice" | "video" | "complete";
 
 export const SimplePodcastWorkflow = ({ onSwitchMode }: SimplePodcastWorkflowProps) => {
   const [currentStep, setCurrentStep] = useState<SimpleStep>("input");
@@ -24,16 +25,19 @@ export const SimplePodcastWorkflow = ({ onSwitchMode }: SimplePodcastWorkflowPro
   const [topic, setTopic] = useState("");
   const [duration, setDuration] = useState(5);
   const [voiceId, setVoiceId] = useState("JBFqnCBsd6RMkjVDRZzb");
+  const [visualOutputType, setVisualOutputType] = useState<VisualOutputType>("video");
   
   // Generated content
   const [generatedScript, setGeneratedScript] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   
   // Loading states
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [videoPredictionId, setVideoPredictionId] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState("");
   
@@ -209,6 +213,64 @@ export const SimplePodcastWorkflow = ({ onSwitchMode }: SimplePodcastWorkflowPro
     }
   };
 
+  const handleGenerateImage = async () => {
+    setIsGeneratingImage(true);
+    setCurrentStep("video");
+
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_LOVABLE_API_KEY || ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [
+            {
+              role: "user",
+              content: `Generate a beautiful, professional podcast studio background image suitable for a podcast about: ${topic.slice(0, 200)}. The image should be cinematic, modern, and visually appealing with soft lighting. Ultra high resolution.`
+            }
+          ],
+          modalities: ["image", "text"]
+        })
+      });
+
+      const data = await response.json();
+      const generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!generatedImageUrl) {
+        throw new Error("Bild-Generierung fehlgeschlagen");
+      }
+
+      setImageUrl(generatedImageUrl);
+      setIsGeneratingImage(false);
+      setCurrentStep("complete");
+
+      toast({
+        title: "Bild fertig!",
+        description: "Dein Podcast-Hintergrundbild wurde erstellt."
+      });
+    } catch (error) {
+      console.error("Image generation error:", error);
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Bild-Generierung fehlgeschlagen",
+        variant: "destructive"
+      });
+      setIsGeneratingImage(false);
+      setCurrentStep("audio");
+    }
+  };
+
+  const handleStartVisualGeneration = () => {
+    if (visualOutputType === "image") {
+      handleGenerateImage();
+    } else {
+      handleGenerateVideo();
+    }
+  };
+
   const handleReset = () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setCurrentStep("input");
@@ -216,8 +278,10 @@ export const SimplePodcastWorkflow = ({ onSwitchMode }: SimplePodcastWorkflowPro
     setGeneratedScript("");
     setAudioUrl("");
     setVideoUrl("");
+    setImageUrl("");
     setVideoPredictionId(null);
     setVideoStatus("");
+    setVisualOutputType("video");
   };
 
   return (
@@ -341,43 +405,62 @@ export const SimplePodcastWorkflow = ({ onSwitchMode }: SimplePodcastWorkflowPro
 
                 <AudioPlayer audioUrl={audioUrl} title="Mein Podcast" />
 
+                {/* Visual Output Choice */}
+                <VisualOutputSelector
+                  value={visualOutputType}
+                  onChange={setVisualOutputType}
+                />
+
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={handleReset} className="gap-2">
                     <ArrowLeft className="h-4 w-4" />
                     Neu starten
                   </Button>
                   <Button
-                    onClick={() => handleGenerateVideo()}
+                    onClick={handleStartVisualGeneration}
                     className="flex-1 h-14 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
                   >
-                    <Video className="h-5 w-5" />
-                    Video erstellen
+                    {visualOutputType === "image" ? (
+                      <>
+                        <ImageIcon className="h-5 w-5" />
+                        Bild erstellen
+                      </>
+                    ) : (
+                      <>
+                        <Video className="h-5 w-5" />
+                        Video erstellen
+                      </>
+                    )}
                     <ArrowRight className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Step: Video Generating */}
-            {currentStep === "video" && !videoUrl && (
+            {/* Step: Visual Generating */}
+            {currentStep === "video" && !videoUrl && !imageUrl && (
               <div className="space-y-6">
                 <div className="text-center space-y-2">
                   <h2 className="text-2xl font-display font-bold text-foreground">
-                    Video wird erstellt
+                    {isGeneratingImage ? "Bild wird erstellt" : "Video wird erstellt"}
                   </h2>
                   <p className="text-muted-foreground">
-                    Dies kann 1-3 Minuten dauern
+                    {isGeneratingImage ? "Dies dauert nur wenige Sekunden" : "Dies kann 1-3 Minuten dauern"}
                   </p>
                 </div>
 
                 <div className="space-y-4 p-6 rounded-xl bg-secondary/50 border border-border">
                   <div className="flex items-center justify-center gap-3">
                     <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                    <span className="font-medium text-foreground">Video wird generiert...</span>
+                    <span className="font-medium text-foreground">
+                      {isGeneratingImage ? "Bild wird generiert..." : "Video wird generiert..."}
+                    </span>
                   </div>
-                  <p className="text-center text-sm text-muted-foreground">
-                    Status: {videoStatus}
-                  </p>
+                  {!isGeneratingImage && (
+                    <p className="text-center text-sm text-muted-foreground">
+                      Status: {videoStatus}
+                    </p>
+                  )}
                 </div>
 
                 {/* Audio player while waiting */}
@@ -395,13 +478,32 @@ export const SimplePodcastWorkflow = ({ onSwitchMode }: SimplePodcastWorkflowPro
                   </div>
                 </div>
 
-                <VideoPlayer 
-                  videoUrl={videoUrl} 
-                  audioUrl={audioUrl}
-                  title="Mein Podcast Video"
-                  onRegenerate={() => handleGenerateVideo()}
-                  isRegenerating={isGeneratingVideo}
-                />
+                {imageUrl && !videoUrl ? (
+                  // Image mode - show image with audio
+                  <div className="space-y-4">
+                    <div className="relative rounded-2xl overflow-hidden bg-black aspect-video">
+                      <img 
+                        src={imageUrl} 
+                        alt="Podcast Hintergrund" 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/90 text-white text-xs font-medium">
+                        <ImageIcon className="h-3 w-3" />
+                        Bild-Modus
+                      </div>
+                    </div>
+                    <AudioPlayer audioUrl={audioUrl} title="Mein Podcast" />
+                  </div>
+                ) : (
+                  // Video mode
+                  <VideoPlayer 
+                    videoUrl={videoUrl} 
+                    audioUrl={audioUrl}
+                    title="Mein Podcast Video"
+                    onRegenerate={() => handleGenerateVideo()}
+                    isRegenerating={isGeneratingVideo}
+                  />
+                )}
 
                 <Button
                   onClick={handleReset}

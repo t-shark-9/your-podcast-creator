@@ -12,9 +12,10 @@ import { SavedConfigurations } from "@/components/SavedConfigurations";
 import { UserMenu } from "@/components/UserMenu";
 import { ModeSelection } from "@/components/ModeSelection";
 import { SimplePodcastWorkflow } from "@/components/SimplePodcastWorkflow";
+import { VisualOutputSelector, type VisualOutputType } from "@/components/VisualOutputSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen, Zap } from "lucide-react";
+import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen, Zap, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -67,14 +68,17 @@ const Index = () => {
   
   // Video state
   const [videoUrl, setVideoUrl] = useState<string>("");
+  const [imageUrl, setImageUrl] = useState<string>("");
   const [videoPredictionId, setVideoPredictionId] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState<string>("");
+  const [visualOutputType, setVisualOutputType] = useState<VisualOutputType>("video");
   
   // Loading states
   const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
   const { toast } = useToast();
 
@@ -342,6 +346,62 @@ const Index = () => {
     }
   };
 
+  const handleGenerateImage = async () => {
+    setIsGeneratingImage(true);
+
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_LOVABLE_API_KEY || ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [
+            {
+              role: "user",
+              content: `Generate a beautiful, professional podcast studio background image. ${videoConfig.background ? `Background: ${videoConfig.background}.` : ""} ${videoConfig.character1 ? `Include a person: ${videoConfig.character1}.` : ""} The image should be cinematic and modern with soft lighting. Topic context: ${config.topics.slice(0, 200)}. Ultra high resolution.`
+            }
+          ],
+          modalities: ["image", "text"]
+        })
+      });
+
+      const data = await response.json();
+      const generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!generatedImageUrl) {
+        throw new Error("Bild-Generierung fehlgeschlagen");
+      }
+
+      setImageUrl(generatedImageUrl);
+      setIsGeneratingImage(false);
+      setCompletedSteps(prev => [...prev.filter(s => s !== "video"), "video"]);
+
+      toast({
+        title: "Bild fertig!",
+        description: "Dein Podcast-Hintergrundbild wurde erstellt."
+      });
+    } catch (error) {
+      console.error("Image generation error:", error);
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Bild-Generierung fehlgeschlagen",
+        variant: "destructive"
+      });
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleStartVisualGeneration = () => {
+    if (visualOutputType === "image") {
+      handleGenerateImage();
+    } else {
+      handleGenerateVideo();
+    }
+  };
+
   const handleReset = () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setCurrentStep("config");
@@ -352,8 +412,10 @@ const Index = () => {
     setFinalScript("");
     setAudioUrl("");
     setVideoUrl("");
+    setImageUrl("");
     setVideoPredictionId(null);
     setVideoStatus("");
+    setVisualOutputType("video");
   };
 
   const handleSaveConfiguration = async () => {
@@ -686,48 +748,70 @@ const Index = () => {
             {/* Step: Video */}
             {currentStep === "video" && (
               <div className="space-y-6">
-                {!videoUrl ? (
+                {!videoUrl && !imageUrl ? (
                   <>
                     <div className="text-center space-y-2">
                       <h2 className="text-2xl font-display font-bold text-foreground">
-                        Video erstellen
+                        Visuellen Output erstellen
                       </h2>
                       <p className="text-muted-foreground">
-                        Generiere ein Video mit zwei Sprechern
+                        Wähle zwischen Bild oder Video
                       </p>
                     </div>
 
+                    {/* Visual Output Choice */}
+                    <VisualOutputSelector
+                      value={visualOutputType}
+                      onChange={setVisualOutputType}
+                      disabled={isGeneratingVideo || isGeneratingImage}
+                    />
+
                     {/* Video Config Summary */}
                     <div className="space-y-4 p-4 rounded-xl bg-muted/30 border border-border">
-                      <h3 className="font-medium text-foreground">Video-Einstellungen</h3>
+                      <h3 className="font-medium text-foreground">Einstellungen</h3>
                       <div className="grid gap-3 text-sm">
                         <div>
                           <span className="text-muted-foreground">Hintergrund:</span>
                           <p className="text-foreground">{videoConfig.background || "Standard-Studio"}</p>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Sprecher 1:</span>
-                          <p className="text-foreground">{videoConfig.character1 || "Automatisch generiert"}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Sprecher 2:</span>
-                          <p className="text-foreground">{videoConfig.character2 || "Automatisch generiert"}</p>
-                        </div>
+                        {visualOutputType === "video" && (
+                          <>
+                            <div>
+                              <span className="text-muted-foreground">Sprecher 1:</span>
+                              <p className="text-foreground">{videoConfig.character1 || "Automatisch generiert"}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Sprecher 2:</span>
+                              <p className="text-foreground">{videoConfig.character2 || "Automatisch generiert"}</p>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    {isGeneratingVideo ? (
+                    {(isGeneratingVideo || isGeneratingImage) ? (
                       <div className="space-y-4 p-6 rounded-xl bg-secondary/50 border border-border">
                         <div className="flex items-center justify-center gap-3">
                           <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                          <span className="font-medium text-foreground">Video wird generiert...</span>
+                          <span className="font-medium text-foreground">
+                            {isGeneratingImage ? "Bild wird generiert..." : "Video wird generiert..."}
+                          </span>
                         </div>
-                        <p className="text-center text-sm text-muted-foreground">
-                          Status: {videoStatus}
-                        </p>
-                        <p className="text-center text-xs text-muted-foreground">
-                          Dies kann 1-3 Minuten dauern
-                        </p>
+                        {isGeneratingVideo && (
+                          <>
+                            <p className="text-center text-sm text-muted-foreground">
+                              Status: {videoStatus}
+                            </p>
+                            <p className="text-center text-xs text-muted-foreground">
+                              Dies kann 1-3 Minuten dauern
+                            </p>
+                          </>
+                        )}
+                        {isGeneratingImage && (
+                          <p className="text-center text-xs text-muted-foreground">
+                            Dies dauert nur wenige Sekunden
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div className="flex gap-3">
@@ -736,11 +820,20 @@ const Index = () => {
                           Zurück
                         </Button>
                         <Button
-                          onClick={() => handleGenerateVideo()}
+                          onClick={handleStartVisualGeneration}
                           className="flex-1 h-14 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
                         >
-                          <Video className="h-5 w-5" />
-                          Video generieren
+                          {visualOutputType === "image" ? (
+                            <>
+                              <ImageIcon className="h-5 w-5" />
+                              Bild generieren
+                            </>
+                          ) : (
+                            <>
+                              <Video className="h-5 w-5" />
+                              Video generieren
+                            </>
+                          )}
                         </Button>
                       </div>
                     )}
@@ -754,13 +847,31 @@ const Index = () => {
                       </div>
                     </div>
 
-                    <VideoPlayer 
-                      videoUrl={videoUrl} 
-                      audioUrl={audioUrl}
-                      title="Mein Podcast Video"
-                      onRegenerate={() => handleGenerateVideo()}
-                      isRegenerating={isGeneratingVideo}
-                    />
+                    {imageUrl && !videoUrl ? (
+                      // Image mode - show image with audio
+                      <div className="space-y-4">
+                        <div className="relative rounded-2xl overflow-hidden bg-black aspect-video">
+                          <img 
+                            src={imageUrl} 
+                            alt="Podcast Hintergrund" 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/90 text-white text-xs font-medium">
+                            <ImageIcon className="h-3 w-3" />
+                            Bild-Modus
+                          </div>
+                        </div>
+                        <AudioPlayer audioUrl={audioUrl} title="Mein Podcast" />
+                      </div>
+                    ) : (
+                      <VideoPlayer 
+                        videoUrl={videoUrl} 
+                        audioUrl={audioUrl}
+                        title="Mein Podcast Video"
+                        onRegenerate={() => handleGenerateVideo()}
+                        isRegenerating={isGeneratingVideo}
+                      />
+                    )}
                     
                     {/* Script Display */}
                     <div className="space-y-2">
