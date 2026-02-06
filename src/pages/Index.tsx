@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { PodcastConfig, PodcastConfigData } from "@/components/PodcastConfig";
 import { VideoConfig, VideoConfigData } from "@/components/VideoConfig";
 import { ScriptVariantSelector } from "@/components/ScriptVariantSelector";
@@ -13,9 +14,10 @@ import { UserMenu } from "@/components/UserMenu";
 import { ModeSelection } from "@/components/ModeSelection";
 import { SimplePodcastWorkflow } from "@/components/SimplePodcastWorkflow";
 import { VisualOutputSelector, type VisualOutputType } from "@/components/VisualOutputSelector";
+import { useN8nConfig, triggerN8nWebhook } from "@/components/N8nSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen, Zap, ImageIcon } from "lucide-react";
+import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen, Zap, ImageIcon, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -35,6 +37,9 @@ const Index = () => {
   const [appMode, setAppMode] = useState<AppMode>("selection");
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("config");
   const [completedSteps, setCompletedSteps] = useState<WorkflowStep[]>([]);
+  
+  // n8n integration
+  const { config: n8nConfig } = useN8nConfig();
   
   // User state
   const [user, setUser] = useState<User | null>(null);
@@ -114,6 +119,21 @@ const Index = () => {
           setVideoUrl(outputUrl);
           setIsGeneratingVideo(false);
           setCompletedSteps(prev => [...prev.filter(s => s !== "video"), "video"]);
+          
+          // Trigger n8n webhook
+          triggerN8nWebhook(n8nConfig, "video_generated", {
+            videoUrl: outputUrl,
+            visualType: visualOutputType
+          });
+          
+          // Also trigger workflow complete if we have everything
+          triggerN8nWebhook(n8nConfig, "workflow_complete", {
+            script: finalScript,
+            audioUrl: audioUrl,
+            videoUrl: outputUrl,
+            topics: config.topics
+          });
+          
           toast({
             title: "Video fertig!",
             description: "Dein Podcast-Video wurde erfolgreich erstellt."
@@ -128,7 +148,7 @@ const Index = () => {
 
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [videoPredictionId, videoUrl, toast, appMode]);
+  }, [videoPredictionId, videoUrl, toast, appMode, n8nConfig, visualOutputType, finalScript, audioUrl, config.topics]);
 
   // Mode selection handlers
   const handleSelectMode = (mode: "simple" | "rigorous") => {
@@ -182,6 +202,13 @@ const Index = () => {
       setOptimizedScript(null);
       setCompletedSteps(prev => [...prev.filter(s => s !== "config"), "config"]);
       setCurrentStep("variants");
+      
+      // Trigger n8n webhook
+      triggerN8nWebhook(n8nConfig, "script_generated", {
+        variants: data.variants,
+        topics: config.topics,
+        duration: duration
+      });
       
       toast({
         title: "Varianten erstellt",
@@ -264,6 +291,13 @@ const Index = () => {
       const url = URL.createObjectURL(audioBlob);
       setAudioUrl(url);
       setCompletedSteps(prev => [...prev.filter(s => s !== "audio"), "audio"]);
+      
+      // Trigger n8n webhook
+      triggerN8nWebhook(n8nConfig, "audio_generated", {
+        script: finalScript,
+        voiceId: voiceId,
+        audioUrl: url
+      });
       
       toast({
         title: "Audio fertig!",
@@ -527,6 +561,11 @@ const Index = () => {
                 <Zap className="w-4 h-4" />
                 Einfacher Modus
               </Button>
+              <Link to="/settings">
+                <Button variant="outline" size="icon" className="h-9 w-9">
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </Link>
               {user && (
                 <>
                   <Dialog open={showSavedDialog} onOpenChange={setShowSavedDialog}>
