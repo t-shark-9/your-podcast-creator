@@ -36,11 +36,11 @@ serve(async (req) => {
           body: JSON.stringify({
             avatar: {
               avatar_id: 412,
-              avatar_type: 0,
+              avatar_type: "0",
             },
             voice: {
               type: "script",
-              voice_id: "en-US-ChristopherNeural",
+              voice_id: "MFZUKuGQUsGJPQjTS4wC",
               script: prompt,
             },
             aspect_ratio: aspectRatio === "16:9" ? "landscape" : aspectRatio === "9:16" ? "portrait" : "square",

@@ -91,7 +91,7 @@ export default function VideoGenerator({
     try {
       const script = getFullScript();
       const avatarId = localStorage.getItem("joggai_selected_avatar") || "412";
-      const voiceId = localStorage.getItem("joggai_selected_voice") || "en-US-ChristopherNeural";
+      const voiceId = localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
 
       const response = await fetch("https://api.jogg.ai/v2/create_video_from_avatar", {
         method: "POST",
@@ -102,7 +102,7 @@ export default function VideoGenerator({
         body: JSON.stringify({
           avatar: {
             avatar_id: parseInt(avatarId),
-            avatar_type: 0,
+            avatar_type: "0",
           },
           voice: {
             type: "script",

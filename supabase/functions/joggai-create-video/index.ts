@@ -52,8 +52,8 @@ async function createVideo(body: any, apiKey: string) {
   const {
     script,
     avatarId = 412,       // Default avatar ID
-    avatarType = 0,       // 0 = public avatar
-    voiceId = "en-US-ChristopherNeural",  // Default voice
+    avatarType = "0",     // "0" = public avatar (must be string)
+    voiceId = "MFZUKuGQUsGJPQjTS4wC",  // Default voice
     aspectRatio = "landscape",  // landscape for podcast format
     screenStyle = 1,      // 1 = full screen
     caption = true,       // Enable subtitles

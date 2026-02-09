@@ -18,7 +18,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse the incoming script data\nconst input = $input.first().json;\n\nconst script = input.script;\nconst speakers = input.speakers;\nconst timestamp = input.timestamp;\n\n// Get settings\nconst avatarId = input.avatarId || 412;\nconst voiceId = input.voiceId || 'en-US-ChristopherNeural';\n\nreturn {\n  script: script,\n  speaker1: speakers?.speaker1 || 'Alex',\n  speaker2: speakers?.speaker2 || 'Sam',\n  timestamp: timestamp,\n  avatarId: avatarId,\n  voiceId: voiceId,\n  aspectRatio: input.aspectRatio || 'landscape',\n  screenStyle: input.screenStyle || 1,\n  caption: input.caption !== false\n};"
+        "jsCode": "// Parse the incoming script data\nconst input = $input.first().json;\n\nconst script = input.script;\nconst speakers = input.speakers;\nconst timestamp = input.timestamp;\n\n// Get settings\nconst avatarId = input.avatarId || 412;\nconst voiceId = input.voiceId || 'MFZUKuGQUsGJPQjTS4wC';\n\nreturn {\n  script: script,\n  speaker1: speakers?.speaker1 || 'Alex',\n  speaker2: speakers?.speaker2 || 'Sam',\n  timestamp: timestamp,\n  avatarId: avatarId,\n  voiceId: voiceId,\n  aspectRatio: input.aspectRatio || 'landscape',\n  screenStyle: input.screenStyle || 1,\n  caption: input.caption !== false\n};"
       },
       "id": "code-format-script",
       "name": "Format Script",
@@ -45,7 +45,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"avatar\": {\n    \"avatar_id\": {{ $json.avatarId }},\n    \"avatar_type\": 0\n  },\n  \"voice\": {\n    \"type\": \"script\",\n    \"voice_id\": {{ JSON.stringify($json.voiceId) }},\n    \"script\": {{ JSON.stringify($json.script) }}\n  },\n  \"aspect_ratio\": {{ JSON.stringify($json.aspectRatio) }},\n  \"screen_style\": {{ $json.screenStyle }},\n  \"caption\": {{ $json.caption }},\n  \"video_name\": {{ JSON.stringify('Podcast Video - ' + $json.timestamp) }},\n  \"webhook_url\": \"{{ $env.WEBHOOK_CALLBACK_URL || '' }}\"\n}",
+        "jsonBody": "={\n  \"avatar\": {\n    \"avatar_id\": {{ $json.avatarId }},\n    \"avatar_type\": \"0\"\n  },\n  \"voice\": {\n    \"type\": \"script\",\n    \"voice_id\": {{ JSON.stringify($json.voiceId) }},\n    \"script\": {{ JSON.stringify($json.script) }}\n  },\n  \"aspect_ratio\": {{ JSON.stringify($json.aspectRatio) }},\n  \"screen_style\": {{ $json.screenStyle }},\n  \"caption\": {{ $json.caption }},\n  \"video_name\": {{ JSON.stringify('Podcast Video - ' + $json.timestamp) }},\n  \"webhook_url\": \"{{ $env.WEBHOOK_CALLBACK_URL || '' }}\"\n}",
         "options": {
           "timeout": 30000
         }

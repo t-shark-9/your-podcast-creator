@@ -75,7 +75,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"avatar\": {\n    \"avatar_id\": 412,\n    \"avatar_type\": 0\n  },\n  \"voice\": {\n    \"type\": \"script\",\n    \"voice_id\": \"en-US-ChristopherNeural\",\n    \"script\": {{ JSON.stringify($json.enhancedPrompt) }}\n  },\n  \"aspect_ratio\": \"landscape\",\n  \"screen_style\": 1,\n  \"caption\": true,\n  \"video_name\": {{ JSON.stringify('Ad Video - ' + new Date().toISOString()) }}\n}",
+        "jsonBody": "={\n  \"avatar\": {\n    \"avatar_id\": 412,\n    \"avatar_type\": \"0\"\n  },\n  \"voice\": {\n    \"type\": \"script\",\n    \"voice_id\": \"MFZUKuGQUsGJPQjTS4wC\",\n    \"script\": {{ JSON.stringify($json.enhancedPrompt) }}\n  },\n  \"aspect_ratio\": \"landscape\",\n  \"screen_style\": 1,\n  \"caption\": true,\n  \"video_name\": {{ JSON.stringify('Ad Video - ' + new Date().toISOString()) }}\n}",
         "options": {
           "timeout": 60000
         }
