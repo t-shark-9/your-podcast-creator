@@ -7,6 +7,8 @@ import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Webhook, F
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useLanguage } from "@/i18n/LanguageContext";
 import DialogueEditor from "@/components/podcast/DialogueEditor";
 import VoiceRecorder from "@/components/podcast/VoiceRecorder";
 import AvatarConfig from "@/components/podcast/AvatarConfig";
@@ -36,8 +38,8 @@ export default function PodcastCreator() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLineId, setProcessingLineId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Load saved voices and avatars from localStorage
   useEffect(() => {
@@ -59,8 +61,8 @@ export default function PodcastCreator() {
   const generatePodcast = async () => {
     if (!topic.trim()) {
       toast({
-        title: "Thema fehlt",
-        description: "Bitte gib ein Thema für den Podcast ein.",
+        title: t("podcast.topic.missing"),
+        description: t("podcast.topic.missing.desc"),
         variant: "destructive"
       });
       return;
@@ -88,15 +90,15 @@ export default function PodcastCreator() {
       setView("editor");
 
       toast({
-        title: "Podcast generiert!",
-        description: `${lines.length} Dialogzeilen wurden erstellt.`
+        title: t("podcast.generated"),
+        description: `${lines.length} ${t("podcast.generated.desc")}`
       });
 
     } catch (error: any) {
       console.error('Error generating podcast:', error);
       toast({
-        title: "Fehler beim Generieren",
-        description: error.message || "Der Podcast konnte nicht generiert werden.",
+        title: t("podcast.error"),
+        description: error.message || t("podcast.error.desc"),
         variant: "destructive"
       });
     } finally {
@@ -163,14 +165,14 @@ export default function PodcastCreator() {
       setDialogue(updatedDialogue);
 
       toast({
-        title: "Text angepasst",
-        description: "Die Änderung wurde erfolgreich angewendet."
+        title: t("podcast.ai.edited"),
+        description: t("podcast.ai.edited.desc")
       });
 
     } catch (error: any) {
       toast({
-        title: "Fehler",
-        description: error.message || "Die Änderung konnte nicht angewendet werden.",
+        title: t("podcast.ai.error"),
+        description: error.message || t("podcast.ai.error.edit"),
         variant: "destructive"
       });
     } finally {
@@ -266,8 +268,8 @@ export default function PodcastCreator() {
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Export erfolgreich",
-      description: "Das Skript wurde als .txt heruntergeladen."
+      title: t("podcast.export.success"),
+      description: t("podcast.export.desc")
     });
 
     // Trigger n8n webhook if configured
@@ -296,8 +298,8 @@ export default function PodcastCreator() {
 
       if (response.ok) {
         toast({
-          title: "n8n Workflow gestartet",
-          description: "Das Skript wurde an den n8n Workflow gesendet."
+          title: t("podcast.n8n.success"),
+          description: t("podcast.n8n.desc")
         });
       }
     } catch (error) {
@@ -357,13 +359,16 @@ export default function PodcastCreator() {
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex items-center gap-4 mb-6">
             <Button variant="ghost" onClick={() => setView("input")}>
-              ← Zurück
+              {t("podcast.back")}
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Einstellungen</h1>
+              <h1 className="text-2xl font-bold">{t("podcast.settings")}</h1>
               <p className="text-sm text-muted-foreground">
-                Konfiguriere deine Stimmen und Avatare
+                {t("podcast.settings.desc")}
               </p>
+            </div>
+            <div className="ml-auto">
+              <LanguageToggle />
             </div>
           </div>
 
@@ -424,42 +429,40 @@ export default function PodcastCreator() {
             <Video className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            Podcast Creator
+            {t("podcast.title")}
           </h1>
           <p className="text-muted-foreground">
-            Erstelle professionelle Podcast-Dialoge mit KI
+            {t("podcast.subtitle")}
           </p>
         </div>
 
-        {/* Settings button */}
+        {/* Navigation buttons */}
         <div className="flex justify-between">
-          <Link to="/ads">
+          <Link to="/">
+            <Button variant="outline" size="sm" className="gap-2">
+              {t("nav.home")}
+            </Button>
+          </Link>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setView("settings")}
               className="gap-2"
             >
-              <Film className="w-4 h-4" />
-              Ad Generator
+              <Settings className="w-4 h-4" />
+              {t("podcast.settings")}
             </Button>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setView("settings")}
-            className="gap-2"
-          >
-            <Settings className="w-4 h-4" />
-            Einstellungen
-          </Button>
+          </div>
         </div>
 
         {/* Main input card */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Neuer Podcast</CardTitle>
+            <CardTitle>{t("podcast.new")}</CardTitle>
             <CardDescription>
-              Beschreibe das Thema für deinen Podcast. Die KI generiert einen Dialog zwischen zwei Sprechern.
+              {t("podcast.new.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -482,12 +485,12 @@ export default function PodcastCreator() {
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generiere Podcast...
+                  {t("podcast.generating")}
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Podcast generieren
+                  {t("podcast.generate")}
                 </>
               )}
             </Button>
@@ -497,7 +500,7 @@ export default function PodcastCreator() {
         {/* Example topics */}
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground text-center">
-            Beispielthemen zum Ausprobieren:
+            {t("podcast.examples")}
           </p>
           <div className="grid gap-2">
             {EXAMPLE_TOPICS.map((example, i) => (

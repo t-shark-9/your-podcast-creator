@@ -29,6 +29,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useLanguage } from "@/i18n/LanguageContext";
 import type { AdProject, AdProjectStatus, CaptionStyle } from "@/types/podcast";
 
 const EXAMPLE_PROMPTS = [
@@ -71,6 +73,7 @@ export default function AdGenerator() {
   const [driveUrl, setDriveUrl] = useState("");
   
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Simulate progress during generation
   useEffect(() => {
@@ -334,13 +337,13 @@ export default function AdGenerator() {
 
   const getStatusLabel = () => {
     switch (status) {
-      case "draft": return "Entwurf";
-      case "enhancing_prompt": return "Prompt wird verbessert...";
-      case "generating_video": return "Video wird generiert...";
-      case "adding_captions": return "Untertitel & Musik hinzufügen";
-      case "uploading_drive": return "Wird zu Google Drive hochgeladen...";
-      case "completed": return "Fertig!";
-      case "failed": return "Fehlgeschlagen";
+      case "draft": return t("ads.status.draft");
+      case "enhancing_prompt": return t("ads.status.enhancing");
+      case "generating_video": return t("ads.status.generating");
+      case "adding_captions": return t("ads.status.captions");
+      case "uploading_drive": return t("ads.status.uploading");
+      case "completed": return t("ads.status.completed");
+      case "failed": return t("ads.status.failed");
       default: return status;
     }
   };
@@ -353,19 +356,19 @@ export default function AdGenerator() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Video className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-bold">Ad Generator</h1>
+              <h1 className="text-xl font-bold">{t("ads.title")}</h1>
               <Badge variant="secondary">{getStatusLabel()}</Badge>
             </div>
             <div className="flex items-center gap-2">
+              <LanguageToggle />
               <Link to="/">
                 <Button variant="ghost" size="sm" className="gap-2">
-                  <Mic className="w-4 h-4" />
-                  Podcast Creator
+                  {t("nav.home")}
                 </Button>
               </Link>
               <Button variant="outline" size="sm" onClick={resetProject}>
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Neu starten
+                {t("ads.restart")}
               </Button>
             </div>
           </div>

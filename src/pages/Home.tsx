@@ -1,0 +1,87 @@
+import { Link } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Mic, Video, ArrowRight, Sparkles } from "lucide-react";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useLanguage } from "@/i18n/LanguageContext";
+
+export default function Home() {
+  const { t } = useLanguage();
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-primary" />
+            <span className="text-lg font-bold">{t("home.title")}</span>
+          </div>
+          <LanguageToggle />
+        </div>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1 flex items-center justify-center p-4">
+        <div className="max-w-4xl w-full space-y-10">
+          <div className="text-center space-y-3">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gradient">
+              {t("home.title")}
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+              {t("home.subtitle")}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Podcast Card */}
+            <Link to="/podcast" className="group">
+              <Card className="h-full border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:glow-primary">
+                <CardHeader className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <Mic className="w-7 h-7 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">{t("home.podcast.title")}</CardTitle>
+                    <CardDescription className="mt-1.5">
+                      {t("home.podcast.description")}
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Button className="gap-2 w-full group-hover:gap-3 transition-all">
+                    {t("home.podcast.cta")}
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Ads Card */}
+            <Link to="/ads" className="group">
+              <Card className="h-full border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-accent/50 hover:glow-accent">
+                <CardHeader className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                    <Video className="w-7 h-7 text-accent" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">{t("home.ads.title")}</CardTitle>
+                    <CardDescription className="mt-1.5">
+                      {t("home.ads.description")}
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="secondary" className="gap-2 w-full group-hover:gap-3 transition-all">
+                    {t("home.ads.cta")}
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
