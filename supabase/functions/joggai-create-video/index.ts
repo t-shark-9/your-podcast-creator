@@ -52,7 +52,7 @@ async function createVideo(body: any, apiKey: string) {
   const {
     script,
     avatarId = 412,       // Default avatar ID
-    avatarType = "0",     // "0" = public avatar (must be string)
+    avatarType = 0,       // 0 = public avatar (must be integer)
     voiceId = "MFZUKuGQUsGJPQjTS4wC",  // Default voice
     aspectRatio = "landscape",  // landscape for podcast format
     screenStyle = 1,      // 1 = full screen

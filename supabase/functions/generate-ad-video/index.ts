@@ -36,7 +36,7 @@ serve(async (req) => {
           body: JSON.stringify({
             avatar: {
               avatar_id: 412,
-              avatar_type: "0",
+              avatar_type: 0,
             },
             voice: {
               type: "script",

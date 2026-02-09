@@ -45,7 +45,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"avatar\": {\n    \"avatar_id\": {{ $json.avatarId }},\n    \"avatar_type\": \"0\"\n  },\n  \"voice\": {\n    \"type\": \"script\",\n    \"voice_id\": {{ JSON.stringify($json.voiceId) }},\n    \"script\": {{ JSON.stringify($json.script) }}\n  },\n  \"aspect_ratio\": {{ JSON.stringify($json.aspectRatio) }},\n  \"screen_style\": {{ $json.screenStyle }},\n  \"caption\": {{ $json.caption }},\n  \"video_name\": {{ JSON.stringify('Podcast Video - ' + $json.timestamp) }},\n  \"webhook_url\": \"{{ $env.WEBHOOK_CALLBACK_URL || '' }}\"\n}",
+        "jsonBody": "={\n  \"avatar\": {\n    \"avatar_id\": {{ $json.avatarId }},\n    \"avatar_type\": 0\n  },\n  \"voice\": {\n    \"type\": \"script\",\n    \"voice_id\": {{ JSON.stringify($json.voiceId) }},\n    \"script\": {{ JSON.stringify($json.script) }}\n  },\n  \"aspect_ratio\": {{ JSON.stringify($json.aspectRatio) }},\n  \"screen_style\": {{ $json.screenStyle }},\n  \"caption\": {{ $json.caption }},\n  \"video_name\": {{ JSON.stringify('Podcast Video - ' + $json.timestamp) }},\n  \"webhook_url\": \"{{ $env.WEBHOOK_CALLBACK_URL || '' }}\"\n}",
         "options": {
           "timeout": 30000
         }

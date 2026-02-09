@@ -102,7 +102,7 @@ export default function VideoGenerator({
         body: JSON.stringify({
           avatar: {
             avatar_id: parseInt(avatarId),
-            avatar_type: "0",
+            avatar_type: 0,
           },
           voice: {
             type: "script",
