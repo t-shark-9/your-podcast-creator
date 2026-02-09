@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Webhook } from "lucide-react";
+import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Webhook, Film } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 import DialogueEditor from "@/components/podcast/DialogueEditor";
 import VoiceRecorder from "@/components/podcast/VoiceRecorder";
 import AvatarConfig from "@/components/podcast/AvatarConfig";
@@ -431,7 +432,17 @@ export default function PodcastCreator() {
         </div>
 
         {/* Settings button */}
-        <div className="flex justify-end">
+        <div className="flex justify-between">
+          <Link to="/ads">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Film className="w-4 h-4" />
+              Ad Generator
+            </Button>
+          </Link>
           <Button
             variant="outline"
             size="sm"

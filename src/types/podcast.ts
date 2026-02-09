@@ -54,3 +54,50 @@ export interface GeneratedVideo {
   status: "pending" | "processing" | "completed" | "failed";
   createdAt: Date;
 }
+
+// Ad Generator Types
+export interface AdProject {
+  id: string;
+  originalPrompt: string;
+  enhancedPrompt: string;
+  videoModel: "veo3" | "sora";
+  status: AdProjectStatus;
+  rawVideoUrl?: string;
+  captionedVideoUrl?: string;
+  googleDriveUrl?: string;
+  musicTrack?: string;
+  captionStyle?: CaptionStyle;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AdProjectStatus = 
+  | "draft"
+  | "enhancing_prompt"
+  | "generating_video"
+  | "adding_captions"
+  | "uploading_drive"
+  | "completed"
+  | "failed";
+
+export interface CaptionStyle {
+  font: string;
+  color: string;
+  backgroundColor: string;
+  position: "top" | "center" | "bottom";
+  animation: "none" | "fade" | "slide" | "bounce";
+}
+
+export interface MusicTrack {
+  id: string;
+  name: string;
+  url: string;
+  duration: number;
+  genre: string;
+}
+
+export interface GoogleDriveConfig {
+  folderId: string;
+  folderName: string;
+  isConnected: boolean;
+}
