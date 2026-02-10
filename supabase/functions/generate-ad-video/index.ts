@@ -35,42 +35,47 @@ serve(async (req) => {
     // Try JoggAI first for avatar-based videos
     if (JOGGAI_API_KEY) {
       try {
-        const response = await fetch(`${JOGGAI_API_URL}/create_video_from_avatar`, {
+        const requestBody = {
+          avatar: {
+            avatar_id: avatarId,
+            avatar_type: avatarType,
+          },
+          voice: {
+            type: "script",
+            voice_id: voiceId,
+            input: prompt,
+          },
+          aspect_ratio: aspectRatio,
+          caption: true,
+        };
+        
+        console.log("JoggAI request:", JSON.stringify(requestBody, null, 2));
+        
+        const response = await fetch(`${JOGGAI_API_URL}/avatar`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-api-key": JOGGAI_API_KEY,
           },
-          body: JSON.stringify({
-            avatar: {
-              avatar_id: avatarId,
-              avatar_type: avatarType,
-            },
-            voice: {
-              type: "script",
-              voice_id: voiceId,
-              script: prompt,
-            },
-            aspect_ratio: aspectRatio === "16:9" ? "landscape" : aspectRatio === "9:16" ? "portrait" : "square",
-            screen_style: 1,
-            caption: true,
-            video_name: `Ad Video - ${new Date().toISOString()}`,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         const data = await response.json();
+        console.log("JoggAI response:", JSON.stringify(data, null, 2));
         
-        if (data.code === 0 && data.data?.video_id) {
-          console.log("JoggAI video creation started:", data.data.video_id);
+        if (data.code === 0 && data.data?.project_id) {
+          console.log("JoggAI video creation started:", data.data.project_id);
           return new Response(
             JSON.stringify({
               success: true,
-              videoId: data.data.video_id,
+              videoId: data.data.project_id,
               provider: "joggai",
               message: "Video generation started. Processing takes 2-5 minutes."
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
+        } else {
+          console.error("JoggAI returned error:", data.msg || "Unknown error");
         }
       } catch (joggError) {
         console.error("JoggAI error, trying fallback:", joggError);

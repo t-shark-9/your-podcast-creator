@@ -64,42 +64,6 @@ export default function VideoGenerator({
     }).join("\n\n");
   };
 
-  // Check if we have multiple speakers in the dialogue
-  const hasMultipleSpeakers = () => {
-    const speakers = new Set(dialogue.map(line => line.speaker));
-    return speakers.size > 1;
-  };
-
-  // Build multi-avatar script segments for JoggAI
-  const buildMultiAvatarScripts = () => {
-    // Get speaker settings
-    const speaker1AvatarId = localStorage.getItem("joggai_speaker1_avatar") || "412";
-    const speaker1AvatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || "0");
-    const speaker1VoiceId = localStorage.getItem("joggai_speaker1_voice") || "MFZUKuGQUsGJPQjTS4wC";
-    
-    const speaker2AvatarId = localStorage.getItem("joggai_speaker2_avatar") || "413";
-    const speaker2AvatarType = parseInt(localStorage.getItem("joggai_speaker2_avatar_type") || "0");
-    const speaker2VoiceId = localStorage.getItem("joggai_speaker2_voice") || "EXAVITQu4vr4xnSDxMaL";
-
-    // Build script segments per speaker
-    const scripts = dialogue.map(line => {
-      const isSpeaker1 = line.speaker === "speaker1";
-      return {
-        avatar: {
-          avatar_id: parseInt(isSpeaker1 ? speaker1AvatarId : speaker2AvatarId),
-          avatar_type: isSpeaker1 ? speaker1AvatarType : speaker2AvatarType,
-        },
-        voice: {
-          type: "script",
-          voice_id: isSpeaker1 ? speaker1VoiceId : speaker2VoiceId,
-          script: line.text,
-        }
-      };
-    });
-
-    return scripts;
-  };
-
   const generateVideo = async () => {
     const apiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY;
     
@@ -125,50 +89,31 @@ export default function VideoGenerator({
     setProgress(0);
 
     try {
-      const useMultiAvatar = hasMultipleSpeakers();
-      let requestBody: any;
+      // Get the full dialogue script with speaker names
+      const script = getFullScript();
+      
+      // Use Speaker 1 settings for the avatar video
+      const avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
+      const voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
+      const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
 
-      if (useMultiAvatar) {
-        // Multi-avatar video with different speakers
-        const scripts = buildMultiAvatarScripts();
-        
-        requestBody = {
-          scripts: scripts,
-          aspect_ratio: "landscape",
-          screen_style: 1,
-          caption: true,
-          video_name: `Podcast: ${new Date().toLocaleDateString('de-DE')}`,
-        };
+      const requestBody = {
+        avatar: {
+          avatar_id: avatarId,
+          avatar_type: avatarType,
+        },
+        voice: {
+          type: "script",
+          voice_id: voiceId,
+          input: script,
+        },
+        aspect_ratio: "16:9",
+        caption: true,
+      };
 
-        toast({
-          title: "Multi-Avatar Video",
-          description: `Video mit ${dialogue.length} Segmenten für 2 Sprecher wird erstellt...`,
-        });
-      } else {
-        // Single avatar video (fallback)
-        const script = getFullScript();
-        const avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
-        const voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
-        const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
+      console.log("JoggAI request body:", JSON.stringify(requestBody, null, 2));
 
-        requestBody = {
-          avatar: {
-            avatar_id: parseInt(avatarId),
-            avatar_type: avatarType,
-          },
-          voice: {
-            type: "script",
-            voice_id: voiceId,
-            script: script,
-          },
-          aspect_ratio: "landscape",
-          screen_style: 1,
-          caption: true,
-          video_name: `Podcast: ${new Date().toLocaleDateString('de-DE')}`,
-        };
-      }
-
-      const response = await fetch("https://api.jogg.ai/v2/create_video_from_avatar", {
+      const response = await fetch("https://api.jogg.ai/v2/avatar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -178,22 +123,21 @@ export default function VideoGenerator({
       });
 
       const data = await response.json();
+      console.log("JoggAI response:", data);
 
       if (data.code !== 0) {
         throw new Error(data.msg || "Video creation failed");
       }
 
-      const videoId = data.data.video_id;
+      const projectId = data.data.project_id;
       setVideoJob({
-        videoId,
+        videoId: projectId,
         status: "processing",
       });
 
       toast({
         title: "Video wird generiert",
-        description: useMultiAvatar 
-          ? "Multi-Avatar Video wird erstellt. Das dauert etwa 3-7 Minuten."
-          : "Das dauert etwa 2-5 Minuten. Du kannst den Fortschritt hier verfolgen.",
+        description: "Das dauert etwa 2-5 Minuten. Du kannst den Fortschritt hier verfolgen.",
       });
 
       // Start polling for status
@@ -220,7 +164,7 @@ export default function VideoGenerator({
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://api.jogg.ai/v2/avatar_video/${videoId}`, {
+        const response = await fetch(`https://api.jogg.ai/v2/project/${videoId}`, {
           method: "GET",
           headers: {
             "x-api-key": apiKey,
@@ -228,6 +172,7 @@ export default function VideoGenerator({
         });
 
         const data = await response.json();
+        console.log("JoggAI status check:", data);
 
         if (data.code !== 0) {
           console.error("Status check failed:", data);
