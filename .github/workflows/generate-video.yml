@@ -1,0 +1,139 @@
+name: Generate Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Video script/dialogue'
+        required: true
+        type: string
+      avatar_id:
+        description: 'JoggAI Avatar ID'
+        required: false
+        default: '412'
+        type: string
+      voice_id:
+        description: 'JoggAI Voice ID'
+        required: false
+        default: 'MFZUKuGQUsGJPQjTS4wC'
+        type: string
+      aspect_ratio:
+        description: 'Aspect ratio'
+        required: false
+        default: '16:9'
+        type: choice
+        options:
+          - '16:9'
+          - '9:16'
+          - '1:1'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create video with JoggAI
+        id: create
+        run: |
+          echo "Creating video with JoggAI..."
+          
+          RESPONSE=$(curl -s -X POST "https://api.jogg.ai/v2/avatar" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${{ secrets.JOGGAI_API_KEY }}" \
+            -d '{
+              "avatar": {
+                "avatar_id": "${{ inputs.avatar_id }}",
+                "avatar_type": 0
+              },
+              "voice": {
+                "type": "script",
+                "voice_id": "${{ inputs.voice_id }}",
+                "input": ${{ toJSON(inputs.script) }}
+              },
+              "aspect_ratio": "${{ inputs.aspect_ratio }}",
+              "caption": true
+            }')
+          
+          echo "Response: $RESPONSE"
+          
+          PROJECT_ID=$(echo $RESPONSE | jq -r '.data.project_id')
+          
+          if [ "$PROJECT_ID" == "null" ] || [ -z "$PROJECT_ID" ]; then
+            echo "Error: Failed to create video"
+            echo $RESPONSE | jq .
+            exit 1
+          fi
+          
+          echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Video creation started: $PROJECT_ID"
+
+      - name: Poll for video completion
+        id: poll
+        run: |
+          PROJECT_ID="${{ steps.create.outputs.project_id }}"
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+          
+          echo "Waiting for video to complete..."
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            
+            RESPONSE=$(curl -s "https://api.jogg.ai/v2/project/$PROJECT_ID" \
+              -H "x-api-key: ${{ secrets.JOGGAI_API_KEY }}")
+            
+            STATUS=$(echo $RESPONSE | jq -r '.data.status')
+            
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - Status: $STATUS"
+            
+            if [ "$STATUS" == "success" ]; then
+              VIDEO_URL=$(echo $RESPONSE | jq -r '.data.video_url')
+              echo "video_url=$VIDEO_URL" >> $GITHUB_OUTPUT
+              echo "✅ Video completed!"
+              echo "📹 URL: $VIDEO_URL"
+              exit 0
+            elif [ "$STATUS" == "failed" ]; then
+              echo "❌ Video generation failed"
+              echo $RESPONSE | jq .
+              exit 1
+            fi
+            
+            sleep 10
+          done
+          
+          echo "❌ Timeout waiting for video"
+          exit 1
+
+      - name: Download video
+        if: success()
+        run: |
+          VIDEO_URL="${{ steps.poll.outputs.video_url }}"
+          FILENAME="video-$(date +%Y%m%d-%H%M%S).mp4"
+          
+          echo "Downloading video..."
+          curl -L -o "$FILENAME" "$VIDEO_URL"
+          
+          echo "Downloaded: $FILENAME"
+          ls -lh "$FILENAME"
+
+      - name: Upload video artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-video
+          path: "*.mp4"
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Video Generation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project ID:** ${{ steps.create.outputs.project_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Video URL:** ${{ steps.poll.outputs.video_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Avatar ID:** ${{ inputs.avatar_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Voice ID:** ${{ inputs.voice_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Aspect Ratio:** ${{ inputs.aspect_ratio }}" >> $GITHUB_STEP_SUMMARY
