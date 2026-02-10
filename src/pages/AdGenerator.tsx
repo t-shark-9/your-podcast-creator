@@ -145,40 +145,68 @@ export default function AdGenerator() {
       return;
     }
 
+    const apiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY;
+    
+    if (!apiKey) {
+      toast({
+        title: "API Key fehlt",
+        description: "Bitte konfiguriere deinen JoggAI API Key in den Einstellungen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     setStatus("generating_video");
     setProgress(0);
 
     try {
       // Get avatar settings from localStorage
-      const avatarId = parseInt(localStorage.getItem("joggai_selected_avatar") || "412");
-      const avatarType = parseInt(localStorage.getItem("joggai_avatar_type") || "0");
-      const voiceId = localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
+      const avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
+      const voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
+      const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
 
-      const { data, error } = await supabase.functions.invoke('generate-ad-video', {
-        body: {
-          prompt: finalPrompt,
-          aspectRatio: "16:9",
-          duration: 10,
-          avatarId,
-          avatarType,
-          voiceId
-        }
+      const requestBody = {
+        avatar: {
+          avatar_id: avatarId,
+          avatar_type: avatarType,
+        },
+        voice: {
+          type: "script",
+          voice_id: voiceId,
+          input: finalPrompt,
+        },
+        aspect_ratio: "16:9",
+        caption: true,
+      };
+
+      console.log("JoggAI request body:", JSON.stringify(requestBody, null, 2));
+
+      const response = await fetch("https://api.jogg.ai/v2/avatar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+        },
+        body: JSON.stringify(requestBody),
       });
 
-      if (error) throw error;
+      const data = await response.json();
+      console.log("JoggAI response:", data);
+
+      if (data.code !== 0) {
+        throw new Error(data.msg || "Video creation failed");
+      }
+
+      const projectId = data.data.project_id;
+      
+      toast({
+        title: "Video wird generiert",
+        description: "Das dauert etwa 2-5 Minuten.",
+      });
 
       // Start polling for video status
-      if (data.videoId) {
-        pollVideoStatus(data.videoId);
-      } else if (data.videoUrl) {
-        setRawVideoUrl(data.videoUrl);
-        setStatus("adding_captions");
-        toast({
-          title: "Video generiert!",
-          description: "Jetzt kannst du Untertitel und Musik hinzufügen."
-        });
-      }
+      pollVideoStatus(projectId, apiKey);
 
     } catch (error: any) {
       console.error('Error generating video:', error);
@@ -193,20 +221,20 @@ export default function AdGenerator() {
     }
   };
 
-  const pollVideoStatus = async (videoId: string) => {
-    const apiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY;
-    
+  const pollVideoStatus = async (projectId: string, apiKey: string) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://api.jogg.ai/v2/avatar_video/${videoId}`, {
+        const response = await fetch(`https://api.jogg.ai/v2/project/${projectId}`, {
           headers: { "x-api-key": apiKey }
         });
         const data = await response.json();
+        console.log("JoggAI status check:", data);
 
-        if ((data.data?.status === "success" || data.data?.status === "completed") && data.data?.video_url) {
+        if (data.data?.status === "success" && data.data?.video_url) {
           clearInterval(interval);
           setRawVideoUrl(data.data.video_url);
           setStatus("adding_captions");
+          setIsGenerating(false);
           toast({
             title: "Video generiert!",
             description: "Jetzt kannst du Untertitel und Musik hinzufügen."
@@ -214,6 +242,7 @@ export default function AdGenerator() {
         } else if (data.data?.status === "failed") {
           clearInterval(interval);
           setStatus("failed");
+          setIsGenerating(false);
           toast({
             title: "Video-Generierung fehlgeschlagen",
             variant: "destructive"
