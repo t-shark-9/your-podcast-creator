@@ -47,11 +47,11 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # Deploy to GitHub Pages (optional)
+  # Deploy to GitHub Pages
   deploy-pages:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main'
     
     permissions:
       contents: read
