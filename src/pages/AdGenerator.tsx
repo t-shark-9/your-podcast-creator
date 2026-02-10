@@ -150,11 +150,19 @@ export default function AdGenerator() {
     setProgress(0);
 
     try {
+      // Get avatar settings from localStorage
+      const avatarId = parseInt(localStorage.getItem("joggai_selected_avatar") || "412");
+      const avatarType = parseInt(localStorage.getItem("joggai_avatar_type") || "0");
+      const voiceId = localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
+
       const { data, error } = await supabase.functions.invoke('generate-ad-video', {
         body: {
           prompt: finalPrompt,
           aspectRatio: "16:9",
-          duration: 10
+          duration: 10,
+          avatarId,
+          avatarType,
+          voiceId
         }
       });
 

@@ -1,7 +1,7 @@
-import { N8nSettings } from "@/components/N8nSettings";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
+import JoggAiConfig from "@/components/podcast/JoggAiConfig";
 
 const Settings = () => {
   return (
@@ -16,12 +16,12 @@ const Settings = () => {
           </Link>
           <div>
             <h1 className="text-2xl font-bold">Einstellungen</h1>
-            <p className="text-muted-foreground">Konfiguriere deine Integrationen</p>
+            <p className="text-muted-foreground">Konfiguriere deinen JoggAI Account</p>
           </div>
         </div>
 
-        {/* n8n Settings */}
-        <N8nSettings />
+        {/* JoggAI Settings */}
+        <JoggAiConfig />
       </div>
     </div>
   );

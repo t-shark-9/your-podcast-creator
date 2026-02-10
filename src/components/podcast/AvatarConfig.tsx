@@ -1,11 +1,19 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Image, Plus, Trash2, Upload, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Image, Plus, Trash2, Upload, User, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Avatar } from "@/types/podcast";
+
+interface JoggAiPhotoAvatar {
+  id: number;
+  name: string;
+  status: number; // 0 = processing, 1 = completed
+  cover_url?: string;
+}
 
 interface AvatarConfigProps {
   avatars: Avatar[];
@@ -25,9 +33,42 @@ export const AvatarConfig = ({
   const [avatarDescription, setAvatarDescription] = useState("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isCreatingAvatar, setIsCreatingAvatar] = useState(false);
+  const [joggAiAvatars, setJoggAiAvatars] = useState<JoggAiPhotoAvatar[]>([]);
+  const [isLoadingAvatars, setIsLoadingAvatars] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const getApiKey = () => {
+    return localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY;
+  };
+
+  // Load JoggAI photo avatars on mount
+  useEffect(() => {
+    loadJoggAiAvatars();
+  }, []);
+
+  const loadJoggAiAvatars = async () => {
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+
+    setIsLoadingAvatars(true);
+    try {
+      const response = await fetch("https://api.jogg.ai/v2/avatars/photo_avatars", {
+        headers: { "x-api-key": apiKey }
+      });
+      const data = await response.json();
+      
+      if (data.code === 0 && data.data?.avatars) {
+        setJoggAiAvatars(data.data.avatars);
+      }
+    } catch (error) {
+      console.error("Error loading photo avatars:", error);
+    } finally {
+      setIsLoadingAvatars(false);
+    }
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,6 +77,16 @@ export const AvatarConfig = ({
         toast({
           title: "Ungültiges Format",
           description: "Bitte wähle eine Bilddatei aus.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check file size (max 10MB for JoggAI)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "Datei zu groß",
+          description: "Die maximale Dateigröße beträgt 10MB.",
           variant: "destructive"
         });
         return;
@@ -50,6 +101,42 @@ export const AvatarConfig = ({
     }
   };
 
+  const uploadImageToJoggAi = async (file: File): Promise<string> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("JoggAI API Key fehlt");
+
+    // First, get upload URL
+    const uploadResponse = await fetch("https://api.jogg.ai/v2/assets/upload_url", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        file_name: file.name,
+        content_type: file.type
+      })
+    });
+
+    const uploadData = await uploadResponse.json();
+    if (uploadData.code !== 0) {
+      throw new Error(uploadData.msg || "Upload URL konnte nicht erstellt werden");
+    }
+
+    // Upload file to the provided URL
+    const { upload_url, asset_url } = uploadData.data;
+    
+    await fetch(upload_url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type
+      },
+      body: file
+    });
+
+    return asset_url;
+  };
+
   const handleSaveAvatar = async () => {
     if (!selectedImage || !avatarName.trim()) {
       toast({
@@ -60,27 +147,108 @@ export const AvatarConfig = ({
       return;
     }
 
-    const newAvatar: Avatar = {
-      id: crypto.randomUUID(),
-      name: avatarName.trim(),
-      description: avatarDescription.trim(),
-      photoUrl: imagePreview || undefined,
-      createdAt: new Date().toISOString(),
-      isUploaded: false
-    };
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      toast({
+        title: "API Key fehlt",
+        description: "Bitte konfiguriere deinen JoggAI API Key in den Einstellungen.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    onAvatarCreated(newAvatar);
+    setIsCreatingAvatar(true);
 
-    // Reset form
-    setAvatarName("");
-    setAvatarDescription("");
-    setSelectedImage(null);
-    setImagePreview(null);
-    setShowNewAvatar(false);
+    try {
+      // Upload the image first
+      toast({
+        title: "Bild wird hochgeladen...",
+        description: "Bitte warten..."
+      });
 
+      const imageUrl = await uploadImageToJoggAi(selectedImage);
+
+      // Create photo avatar in JoggAI
+      toast({
+        title: "Avatar wird erstellt...",
+        description: "Dies kann einige Minuten dauern."
+      });
+
+      const response = await fetch("https://api.jogg.ai/v2/avatars/create_photo_avatar", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: avatarName.trim(),
+          image_url: imageUrl
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.code !== 0) {
+        throw new Error(data.msg || "Avatar konnte nicht erstellt werden");
+      }
+
+      // Save locally and reload JoggAI avatars
+      const newAvatar: Avatar = {
+        id: data.data?.avatar_id?.toString() || crypto.randomUUID(),
+        name: avatarName.trim(),
+        description: avatarDescription.trim(),
+        photoUrl: imagePreview || undefined,
+        createdAt: new Date().toISOString(),
+        isUploaded: true,
+        joggAiAvatarId: data.data?.avatar_id
+      };
+
+      onAvatarCreated(newAvatar);
+
+      // Reset form
+      setAvatarName("");
+      setAvatarDescription("");
+      setSelectedImage(null);
+      setImagePreview(null);
+      setShowNewAvatar(false);
+
+      // Reload JoggAI avatars
+      setTimeout(() => loadJoggAiAvatars(), 2000);
+
+      toast({
+        title: "Avatar wird erstellt!",
+        description: `"${newAvatar.name}" wird bei JoggAI verarbeitet. Dies dauert etwa 2-5 Minuten.`
+      });
+
+    } catch (error: any) {
+      console.error("Error creating avatar:", error);
+      toast({
+        title: "Fehler beim Erstellen",
+        description: error.message || "Der Avatar konnte nicht erstellt werden.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingAvatar(false);
+    }
+  };
+
+  const selectJoggAiAvatar = (avatar: JoggAiPhotoAvatar, speaker: 1 | 2) => {
+    if (avatar.status !== 1) {
+      toast({
+        title: "Avatar wird noch verarbeitet",
+        description: "Bitte warte, bis der Avatar fertig ist.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const prefix = `joggai_speaker${speaker}`;
+    localStorage.setItem(`${prefix}_avatar`, avatar.id.toString());
+    localStorage.setItem(`${prefix}_avatar_type`, "1"); // Photo avatar type
+    
     toast({
-      title: "Avatar gespeichert",
-      description: `"${newAvatar.name}" wurde erfolgreich hinzugefügt.`
+      title: `Avatar für Sprecher ${speaker} ausgewählt`,
+      description: `"${avatar.name}" wird für Sprecher ${speaker} verwendet.`
     });
   };
 
@@ -95,58 +263,98 @@ export const AvatarConfig = ({
   return (
     <Card className="border-border/50 bg-card/50">
       <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <User className="w-5 h-5" />
-          Meine Avatare
-        </CardTitle>
-        <CardDescription>
-          Lade ein Foto hoch, um einen AI-Avatar für den Podcast zu erstellen.
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Meine Photo Avatare
+            </CardTitle>
+            <CardDescription>
+              Erstelle personalisierte AI-Avatare aus deinen Fotos mit JoggAI.
+            </CardDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={loadJoggAiAvatars}
+            disabled={isLoadingAvatars}
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingAvatars ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Existing avatars list */}
-        {avatars.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {avatars.map(avatar => (
-              <div
-                key={avatar.id}
-                className="relative group rounded-lg border border-border/50 bg-background/50 overflow-hidden"
-              >
-                {avatar.photoUrl ? (
-                  <img
-                    src={avatar.photoUrl}
-                    alt={avatar.name}
-                    className="w-full aspect-square object-cover"
-                  />
-                ) : (
-                  <div className="w-full aspect-square bg-muted flex items-center justify-center">
-                    <User className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white text-sm font-medium truncate">{avatar.name}</p>
-                      <div className="flex items-center gap-1">
-                        <div className={`w-1.5 h-1.5 rounded-full ${avatar.isUploaded ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                        <span className="text-white/70 text-xs">
-                          {avatar.isUploaded ? 'Hochgeladen' : 'Lokal'}
-                        </span>
+        {/* JoggAI Photo Avatars */}
+        {joggAiAvatars.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-muted-foreground">Deine JoggAI Avatare</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {joggAiAvatars.map(avatar => {
+                const isSpeaker1 = localStorage.getItem("joggai_speaker1_avatar") === avatar.id.toString() 
+                  && localStorage.getItem("joggai_speaker1_avatar_type") === "1";
+                const isSpeaker2 = localStorage.getItem("joggai_speaker2_avatar") === avatar.id.toString()
+                  && localStorage.getItem("joggai_speaker2_avatar_type") === "1";
+                
+                return (
+                  <div
+                    key={avatar.id}
+                    className={`relative group rounded-lg border border-border/50 bg-background/50 overflow-hidden ${
+                      isSpeaker1 || isSpeaker2 ? 'ring-2 ring-primary' : ''
+                    }`}
+                  >
+                    {avatar.cover_url ? (
+                      <img
+                        src={avatar.cover_url}
+                        alt={avatar.name}
+                        className="w-full aspect-square object-cover"
+                      />
+                    ) : (
+                      <div className="w-full aspect-square bg-muted flex items-center justify-center">
+                        <User className="w-8 h-8 text-muted-foreground" />
                       </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-2">
+                      <p className="text-white text-sm font-medium truncate mb-1">{avatar.name}</p>
+                      <div className="flex items-center gap-1 mb-2">
+                        <Badge 
+                          variant={avatar.status === 1 ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {avatar.status === 1 ? (
+                            <><CheckCircle2 className="w-3 h-3 mr-1" /> Fertig</>
+                          ) : (
+                            <><Clock className="w-3 h-3 mr-1" /> Verarbeitung</>
+                          )}
+                        </Badge>
+                        {isSpeaker1 && <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-200">S1</Badge>}
+                        {isSpeaker2 && <Badge variant="outline" className="text-xs bg-green-500/20 text-green-200">S2</Badge>}
+                      </div>
+                      {avatar.status === 1 && (
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant={isSpeaker1 ? "default" : "secondary"}
+                            className="h-6 text-xs flex-1"
+                            onClick={() => selectJoggAiAvatar(avatar, 1)}
+                          >
+                            Sprecher 1
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={isSpeaker2 ? "default" : "secondary"}
+                            className="h-6 text-xs flex-1"
+                            onClick={() => selectJoggAiAvatar(avatar, 2)}
+                          >
+                            Sprecher 2
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-white hover:text-red-400 hover:bg-red-500/20"
-                      onClick={() => onAvatarDeleted(avatar.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
                   </div>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -183,9 +391,9 @@ export const AvatarConfig = ({
               ) : (
                 <div className="text-center">
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="font-medium">Bild hochladen</p>
+                  <p className="font-medium">Foto hochladen</p>
                   <p className="text-sm text-muted-foreground">
-                    Klicke oder ziehe ein Bild hierher
+                    Verwende ein klares Portraitfoto mit gutem Licht
                   </p>
                 </div>
               )}
@@ -200,17 +408,14 @@ export const AvatarConfig = ({
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Beschreibung (optional)</label>
-              <Textarea
-                value={avatarDescription}
-                onChange={(e) => setAvatarDescription(e.target.value)}
-                placeholder="Beschreibe den Avatar, z.B. Alter, Stil, Kleidung..."
-                className="min-h-[80px] resize-none"
-              />
-              <p className="text-xs text-muted-foreground">
-                Diese Beschreibung hilft der KI, den Avatar passend zu generieren.
-              </p>
+            <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+              <p className="font-medium mb-1">Tipps für beste Ergebnisse:</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Verwende ein klares Frontalfoto des Gesichts</li>
+                <li>Gute Beleuchtung ohne harte Schatten</li>
+                <li>Mindestens 512x512 Pixel Auflösung</li>
+                <li>Die Verarbeitung dauert 2-5 Minuten</li>
+              </ul>
             </div>
 
             {/* Save/Cancel buttons */}
@@ -220,15 +425,15 @@ export const AvatarConfig = ({
               </Button>
               <Button
                 onClick={handleSaveAvatar}
-                disabled={!selectedImage || !avatarName.trim() || isUploading}
+                disabled={!selectedImage || !avatarName.trim() || isCreatingAvatar}
                 className="gap-2"
               >
-                {isUploading ? (
+                {isCreatingAvatar ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Image className="w-4 h-4" />
                 )}
-                Avatar speichern
+                Avatar bei JoggAI erstellen
               </Button>
             </div>
           </div>
@@ -239,7 +444,7 @@ export const AvatarConfig = ({
             className="w-full gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neuen Avatar hinzufügen
+            Neuen Photo Avatar erstellen
           </Button>
         )}
       </CardContent>

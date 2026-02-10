@@ -16,7 +16,15 @@ serve(async (req) => {
     const JOGGAI_API_KEY = Deno.env.get("JOGGAI_API_KEY");
     const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
     
-    const { prompt, model, aspectRatio = "16:9", duration = 10 } = await req.json();
+    const { 
+      prompt, 
+      model, 
+      aspectRatio = "16:9", 
+      duration = 10,
+      avatarId = 412,
+      avatarType = 0,
+      voiceId = "MFZUKuGQUsGJPQjTS4wC"
+    } = await req.json();
 
     if (!prompt) {
       throw new Error("Prompt is required");
@@ -35,12 +43,12 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             avatar: {
-              avatar_id: 412,
-              avatar_type: 0,
+              avatar_id: avatarId,
+              avatar_type: avatarType,
             },
             voice: {
               type: "script",
-              voice_id: "MFZUKuGQUsGJPQjTS4wC",
+              voice_id: voiceId,
               script: prompt,
             },
             aspect_ratio: aspectRatio === "16:9" ? "landscape" : aspectRatio === "9:16" ? "portrait" : "square",

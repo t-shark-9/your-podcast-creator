@@ -34,8 +34,18 @@ export default function JoggAiConfig({ onAvatarsLoaded, onVoicesLoaded }: JoggAi
   const [userEmail, setUserEmail] = useState("");
   const [avatars, setAvatars] = useState<JoggAiAvatar[]>([]);
   const [voices, setVoices] = useState<JoggAiVoice[]>([]);
-  const [selectedAvatar, setSelectedAvatar] = useState<string>("");
-  const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const [photoAvatars, setPhotoAvatars] = useState<JoggAiAvatar[]>([]);
+  
+  // Speaker 1 settings
+  const [speaker1Avatar, setSpeaker1Avatar] = useState<string>("");
+  const [speaker1Voice, setSpeaker1Voice] = useState<string>("");
+  const [speaker1AvatarType, setSpeaker1AvatarType] = useState<string>("0");
+  
+  // Speaker 2 settings
+  const [speaker2Avatar, setSpeaker2Avatar] = useState<string>("");
+  const [speaker2Voice, setSpeaker2Voice] = useState<string>("");
+  const [speaker2AvatarType, setSpeaker2AvatarType] = useState<string>("0");
+  
   const [isLoadingResources, setIsLoadingResources] = useState(false);
   
   const { toast } = useToast();
@@ -43,12 +53,24 @@ export default function JoggAiConfig({ onAvatarsLoaded, onVoicesLoaded }: JoggAi
   useEffect(() => {
     // Load saved settings
     const savedApiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
-    const savedAvatar = localStorage.getItem("joggai_selected_avatar") || "";
-    const savedVoice = localStorage.getItem("joggai_selected_voice") || "";
+    
+    // Load speaker 1 settings
+    const savedSpeaker1Avatar = localStorage.getItem("joggai_speaker1_avatar") || "";
+    const savedSpeaker1Voice = localStorage.getItem("joggai_speaker1_voice") || "";
+    const savedSpeaker1AvatarType = localStorage.getItem("joggai_speaker1_avatar_type") || "0";
+    
+    // Load speaker 2 settings
+    const savedSpeaker2Avatar = localStorage.getItem("joggai_speaker2_avatar") || "";
+    const savedSpeaker2Voice = localStorage.getItem("joggai_speaker2_voice") || "";
+    const savedSpeaker2AvatarType = localStorage.getItem("joggai_speaker2_avatar_type") || "0";
     
     setApiKey(savedApiKey);
-    setSelectedAvatar(savedAvatar);
-    setSelectedVoice(savedVoice);
+    setSpeaker1Avatar(savedSpeaker1Avatar);
+    setSpeaker1Voice(savedSpeaker1Voice);
+    setSpeaker1AvatarType(savedSpeaker1AvatarType);
+    setSpeaker2Avatar(savedSpeaker2Avatar);
+    setSpeaker2Voice(savedSpeaker2Voice);
+    setSpeaker2AvatarType(savedSpeaker2AvatarType);
     
     if (savedApiKey) {
       validateApiKey(savedApiKey);
@@ -111,7 +133,7 @@ export default function JoggAiConfig({ onAvatarsLoaded, onVoicesLoaded }: JoggAi
     setIsLoadingResources(true);
     
     try {
-      // Load avatars
+      // Load public avatars
       const avatarsRes = await fetch("https://api.jogg.ai/v2/avatars/public", {
         method: "GET",
         headers: { "x-api-key": key },
@@ -121,6 +143,26 @@ export default function JoggAiConfig({ onAvatarsLoaded, onVoicesLoaded }: JoggAi
       if (avatarsData.code === 0 && avatarsData.data) {
         setAvatars(avatarsData.data);
         onAvatarsLoaded?.(avatarsData.data);
+      }
+
+      // Load photo avatars (custom avatars)
+      const photoAvatarsRes = await fetch("https://api.jogg.ai/v2/avatars/photo_avatars", {
+        method: "GET",
+        headers: { "x-api-key": key },
+      });
+      const photoAvatarsData = await photoAvatarsRes.json();
+      
+      if (photoAvatarsData.code === 0 && photoAvatarsData.data?.avatars) {
+        // Convert to same format, only include completed avatars (status: 1)
+        const completedPhotoAvatars = photoAvatarsData.data.avatars
+          .filter((a: any) => a.status === 1)
+          .map((a: any) => ({
+            avatar_id: a.id,
+            name: a.name,
+            preview_url: a.cover_url,
+            isPhotoAvatar: true
+          }));
+        setPhotoAvatars(completedPhotoAvatars);
       }
 
       // Load voices
@@ -137,7 +179,7 @@ export default function JoggAiConfig({ onAvatarsLoaded, onVoicesLoaded }: JoggAi
 
       toast({
         title: "Ressourcen geladen",
-        description: `${avatarsData.data?.length || 0} Avatare, ${voicesData.data?.length || 0} Stimmen`,
+        description: `${avatarsData.data?.length || 0} Avatare, ${photoAvatarsData.data?.avatars?.length || 0} Photo Avatare, ${voicesData.data?.length || 0} Stimmen`,
       });
     } catch (error) {
       console.error("Error loading resources:", error);
@@ -146,15 +188,54 @@ export default function JoggAiConfig({ onAvatarsLoaded, onVoicesLoaded }: JoggAi
     }
   };
 
-  const handleAvatarChange = (avatarId: string) => {
-    setSelectedAvatar(avatarId);
-    localStorage.setItem("joggai_selected_avatar", avatarId);
+  // Speaker 1 handlers
+  const handleSpeaker1AvatarChange = (value: string) => {
+    // Check if it's a photo avatar (format: "photo_123")
+    if (value.startsWith("photo_")) {
+      const avatarId = value.replace("photo_", "");
+      setSpeaker1Avatar(avatarId);
+      setSpeaker1AvatarType("1");
+      localStorage.setItem("joggai_speaker1_avatar", avatarId);
+      localStorage.setItem("joggai_speaker1_avatar_type", "1");
+    } else {
+      setSpeaker1Avatar(value);
+      setSpeaker1AvatarType("0");
+      localStorage.setItem("joggai_speaker1_avatar", value);
+      localStorage.setItem("joggai_speaker1_avatar_type", "0");
+    }
   };
 
-  const handleVoiceChange = (voiceId: string) => {
-    setSelectedVoice(voiceId);
-    localStorage.setItem("joggai_selected_voice", voiceId);
+  const handleSpeaker1VoiceChange = (voiceId: string) => {
+    setSpeaker1Voice(voiceId);
+    localStorage.setItem("joggai_speaker1_voice", voiceId);
   };
+
+  // Speaker 2 handlers
+  const handleSpeaker2AvatarChange = (value: string) => {
+    if (value.startsWith("photo_")) {
+      const avatarId = value.replace("photo_", "");
+      setSpeaker2Avatar(avatarId);
+      setSpeaker2AvatarType("1");
+      localStorage.setItem("joggai_speaker2_avatar", avatarId);
+      localStorage.setItem("joggai_speaker2_avatar_type", "1");
+    } else {
+      setSpeaker2Avatar(value);
+      setSpeaker2AvatarType("0");
+      localStorage.setItem("joggai_speaker2_avatar", value);
+      localStorage.setItem("joggai_speaker2_avatar_type", "0");
+    }
+  };
+
+  const handleSpeaker2VoiceChange = (voiceId: string) => {
+    setSpeaker2Voice(voiceId);
+    localStorage.setItem("joggai_speaker2_voice", voiceId);
+  };
+
+  // Combined list of all avatars for selection
+  const allAvatars = [
+    ...photoAvatars.map(a => ({ ...a, isPhoto: true })),
+    ...avatars.map(a => ({ ...a, isPhoto: false }))
+  ];
 
   return (
     <div className="space-y-6">
@@ -242,51 +323,143 @@ export default function JoggAiConfig({ onAvatarsLoaded, onVoicesLoaded }: JoggAi
                   </Button>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Standard-Avatar</Label>
-                    <Select value={selectedAvatar} onValueChange={handleAvatarChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Avatar auswählen..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {avatars.slice(0, 50).map((avatar) => (
-                          <SelectItem 
-                            key={avatar.avatar_id} 
-                            value={String(avatar.avatar_id)}
-                          >
-                            {avatar.name || `Avatar ${avatar.avatar_id}`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {avatars.length} Avatare verfügbar
-                    </p>
-                  </div>
+                {/* Speaker 1 Settings */}
+                <div className="p-4 rounded-lg border border-border/50 bg-muted/20 space-y-4">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Badge variant="outline">Sprecher 1</Badge>
+                  </h4>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Avatar</Label>
+                      <Select 
+                        value={speaker1AvatarType === "1" ? `photo_${speaker1Avatar}` : speaker1Avatar} 
+                        onValueChange={handleSpeaker1AvatarChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Avatar auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {photoAvatars.length > 0 && (
+                            <>
+                              <SelectItem value="__photo_header" disabled className="font-semibold text-primary">
+                                📸 Meine Photo Avatare
+                              </SelectItem>
+                              {photoAvatars.map((avatar) => (
+                                <SelectItem 
+                                  key={`photo_${avatar.avatar_id}`} 
+                                  value={`photo_${avatar.avatar_id}`}
+                                >
+                                  {avatar.name || `Photo Avatar ${avatar.avatar_id}`}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="__public_header" disabled className="font-semibold text-primary mt-2">
+                                🌐 Öffentliche Avatare
+                              </SelectItem>
+                            </>
+                          )}
+                          {avatars.slice(0, 50).map((avatar) => (
+                            <SelectItem 
+                              key={avatar.avatar_id} 
+                              value={String(avatar.avatar_id)}
+                            >
+                              {avatar.name || `Avatar ${avatar.avatar_id}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label>Standard-Stimme</Label>
-                    <Select value={selectedVoice} onValueChange={handleVoiceChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Stimme auswählen..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {voices.slice(0, 50).map((voice) => (
-                          <SelectItem 
-                            key={voice.voice_id} 
-                            value={voice.voice_id}
-                          >
-                            {voice.name} {voice.language && `(${voice.language})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {voices.length} Stimmen verfügbar
-                    </p>
+                    <div className="space-y-2">
+                      <Label>Stimme</Label>
+                      <Select value={speaker1Voice} onValueChange={handleSpeaker1VoiceChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Stimme auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {voices.slice(0, 50).map((voice) => (
+                            <SelectItem 
+                              key={voice.voice_id} 
+                              value={voice.voice_id}
+                            >
+                              {voice.name} {voice.language && `(${voice.language})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
+
+                {/* Speaker 2 Settings */}
+                <div className="p-4 rounded-lg border border-border/50 bg-muted/20 space-y-4">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Badge variant="outline">Sprecher 2</Badge>
+                  </h4>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Avatar</Label>
+                      <Select 
+                        value={speaker2AvatarType === "1" ? `photo_${speaker2Avatar}` : speaker2Avatar} 
+                        onValueChange={handleSpeaker2AvatarChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Avatar auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {photoAvatars.length > 0 && (
+                            <>
+                              <SelectItem value="__photo_header" disabled className="font-semibold text-primary">
+                                📸 Meine Photo Avatare
+                              </SelectItem>
+                              {photoAvatars.map((avatar) => (
+                                <SelectItem 
+                                  key={`photo_${avatar.avatar_id}`} 
+                                  value={`photo_${avatar.avatar_id}`}
+                                >
+                                  {avatar.name || `Photo Avatar ${avatar.avatar_id}`}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="__public_header" disabled className="font-semibold text-primary mt-2">
+                                🌐 Öffentliche Avatare
+                              </SelectItem>
+                            </>
+                          )}
+                          {avatars.slice(0, 50).map((avatar) => (
+                            <SelectItem 
+                              key={avatar.avatar_id} 
+                              value={String(avatar.avatar_id)}
+                            >
+                              {avatar.name || `Avatar ${avatar.avatar_id}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Stimme</Label>
+                      <Select value={speaker2Voice} onValueChange={handleSpeaker2VoiceChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Stimme auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {voices.slice(0, 50).map((voice) => (
+                            <SelectItem 
+                              key={voice.voice_id} 
+                              value={voice.voice_id}
+                            >
+                              {voice.name} {voice.language && `(${voice.language})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  {avatars.length} öffentliche Avatare, {photoAvatars.length} Photo Avatare, {voices.length} Stimmen verfügbar
+                </p>
               </div>
             </>
           )}
