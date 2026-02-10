@@ -69,20 +69,17 @@ serve(async (req) => {
       }
     }
 
-    // Try Replicate for VEO3/Sora-style generation
+    // Try Replicate for video generation
     if (REPLICATE_API_KEY) {
       const Replicate = (await import("https://esm.sh/replicate@0.25.2")).default;
       const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-      // Use a video generation model (like Stable Video Diffusion or similar)
+      // Use minimax/video-01 for text-to-video generation
       const prediction = await replicate.predictions.create({
-        version: "3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438", // stable-video-diffusion
+        version: "c8bcc4751328608bb75043b3af7bed352ebc2a1d7ef259755f543d7e5f33d586",
         input: {
           prompt: prompt,
-          video_length: duration,
-          fps: 24,
-          motion_bucket_id: 127,
-          cond_aug: 0.02,
+          prompt_optimizer: true,
         },
       });
 
