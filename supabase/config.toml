@@ -14,3 +14,18 @@ verify_jwt = false
 
 [functions.generate-podcast-video]
 verify_jwt = false
+
+[functions.generate-ad-video]
+verify_jwt = false
+
+[functions.add-captions-music]
+verify_jwt = false
+
+[functions.enhance-video-prompt]
+verify_jwt = false
+
+[functions.save-to-drive]
+verify_jwt = false
+
+[functions.joggai-create-video]
+verify_jwt = false
