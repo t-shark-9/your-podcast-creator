@@ -175,14 +175,14 @@ export default function VideoGenerator({
         
         setVideoJob({
           videoId,
-          status: status === "completed" ? "completed" : 
+          status: status === "success" || status === "completed" ? "completed" : 
                   status === "failed" ? "failed" : "processing",
           videoUrl: data.data.video_url,
           coverUrl: data.data.cover_url,
           createdAt: data.data.created_at,
         });
 
-        if (status === "completed") {
+        if (status === "success" || status === "completed") {
           clearInterval(interval);
           setPollingInterval(null);
           toast({
