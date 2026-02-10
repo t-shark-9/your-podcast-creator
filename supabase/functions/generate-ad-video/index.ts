@@ -74,9 +74,9 @@ serve(async (req) => {
       const Replicate = (await import("https://esm.sh/replicate@0.25.2")).default;
       const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-      // Use minimax/video-01 for text-to-video generation
+      // Use minimax/video-01 for text-to-video generation (no version = latest)
       const prediction = await replicate.predictions.create({
-        version: "c8bcc4751328608bb75043b3af7bed352ebc2a1d7ef259755f543d7e5f33d586",
+        model: "minimax/video-01",
         input: {
           prompt: prompt,
           prompt_optimizer: true,
