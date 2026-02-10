@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +57,6 @@ const MUSIC_GENRES = [
 export default function AdGenerator() {
   const [prompt, setPrompt] = useState("");
   const [enhancedPrompt, setEnhancedPrompt] = useState("");
-  const [videoModel, setVideoModel] = useState<"veo3" | "sora">("veo3");
   const [status, setStatus] = useState<AdProjectStatus>("draft");
   const [progress, setProgress] = useState(0);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -106,8 +104,7 @@ export default function AdGenerator() {
     try {
       const { data, error } = await supabase.functions.invoke('enhance-video-prompt', {
         body: {
-          prompt: prompt.trim(),
-          targetModel: videoModel
+          prompt: prompt.trim()
         }
       });
 
@@ -156,7 +153,6 @@ export default function AdGenerator() {
       const { data, error } = await supabase.functions.invoke('generate-ad-video', {
         body: {
           prompt: finalPrompt,
-          model: videoModel,
           aspectRatio: "16:9",
           duration: 10
         }
@@ -199,7 +195,7 @@ export default function AdGenerator() {
         });
         const data = await response.json();
 
-        if (data.data?.status === "completed" && data.data?.video_url) {
+        if ((data.data?.status === "success" || data.data?.status === "completed") && data.data?.video_url) {
           clearInterval(interval);
           setRawVideoUrl(data.data.video_url);
           setStatus("adding_captions");
@@ -414,35 +410,18 @@ export default function AdGenerator() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="space-y-2 flex-1">
-                    <Label>Video-Modell</Label>
-                    <Select value={videoModel} onValueChange={(v: "veo3" | "sora") => setVideoModel(v)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="veo3">Google VEO 3</SelectItem>
-                        <SelectItem value="sora">OpenAI Sora</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="pt-6">
-                    <Button 
-                      onClick={enhancePrompt} 
-                      disabled={isEnhancing || !prompt.trim() || status !== "draft"}
-                      className="gap-2"
-                    >
-                      {isEnhancing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Wand2 className="w-4 h-4" />
-                      )}
-                      Prompt verbessern
-                    </Button>
-                  </div>
-                </div>
+                <Button 
+                  onClick={enhancePrompt} 
+                  disabled={isEnhancing || !prompt.trim() || status !== "draft"}
+                  className="gap-2"
+                >
+                  {isEnhancing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-4 h-4" />
+                  )}
+                  Prompt verbessern
+                </Button>
 
                 {enhancedPrompt && (
                   <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
@@ -481,7 +460,7 @@ export default function AdGenerator() {
                   <div className="space-y-2">
                     <Progress value={progress} className="h-2" />
                     <p className="text-xs text-muted-foreground text-center">
-                      Video wird mit {videoModel === "veo3" ? "Google VEO 3" : "OpenAI Sora"} generiert... (~2-5 Minuten)
+                      Video wird generiert... (~2-5 Minuten)
                     </p>
                   </div>
                 )}
