@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, Video, CheckCircle2, AlertCircle, Download, ExternalLink, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import type { DialogueLine } from "@/types/podcast";
 import type { PodcastSpeakerConfig } from "@/lib/joggai";
 
@@ -197,16 +198,20 @@ export default function VideoGenerator({
 
       console.log("JoggAI podcast request body:", JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch("https://api.jogg.ai/v2/create_video_from_avatar", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
+      // Route through Supabase Edge Function proxy to avoid CORS
+      const { data, error: invokeError } = await supabase.functions.invoke("joggai-proxy", {
+        body: {
+          endpoint: "/create_video_from_avatar",
+          method: "POST",
+          payload: requestBody,
+          apiKey: apiKey || undefined,
         },
-        body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      if (invokeError) {
+        throw new Error(`Proxy error: ${invokeError.message}`);
+      }
+
       console.log("JoggAI response:", data);
 
       if (data.code !== 0) {
@@ -229,7 +234,7 @@ export default function VideoGenerator({
       });
 
       // Start polling for status
-      startPolling(videoId, apiKey);
+      startPolling(videoId);
 
     } catch (error) {
       console.error("Video generation error:", error);
@@ -244,22 +249,29 @@ export default function VideoGenerator({
     }
   };
 
-  const startPolling = (videoId: string, apiKey: string) => {
+  const startPolling = (videoId: string) => {
     // Clear any existing interval
     if (pollingInterval) {
       clearInterval(pollingInterval);
     }
 
+    const pollApiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
+
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://api.jogg.ai/v2/avatar_video/${videoId}`, {
-          method: "GET",
-          headers: {
-            "x-api-key": apiKey,
+        const { data, error: invokeError } = await supabase.functions.invoke("joggai-proxy", {
+          body: {
+            endpoint: `/avatar_video/${videoId}`,
+            method: "GET",
+            apiKey: pollApiKey || undefined,
           },
         });
 
-        const data = await response.json();
+        if (invokeError) {
+          console.error("Polling proxy error:", invokeError);
+          return;
+        }
+
         console.log("JoggAI status check:", data);
 
         if (data.code !== 0) {

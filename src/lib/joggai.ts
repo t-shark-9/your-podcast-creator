@@ -1,7 +1,7 @@
 // JoggAI API Service
-// Handles all interactions with the JoggAI API
+// All requests are proxied through Supabase Edge Functions to avoid CORS issues
 
-const API_BASE = "https://api.jogg.ai/v2";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface JoggAiAvatar {
   avatar_id: number | string;
@@ -46,28 +46,42 @@ class JoggAiService {
     return localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
   }
 
+  /**
+   * All JoggAI requests go through the Supabase Edge Function proxy
+   * to avoid CORS issues when deployed to GitHub Pages.
+   */
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const apiKey = this.getApiKey();
-    if (!apiKey) {
-      throw new Error("JoggAI API Key nicht konfiguriert");
+
+    const method = options.method || "GET";
+    let payload: unknown = undefined;
+    if (options.body && typeof options.body === "string") {
+      try {
+        payload = JSON.parse(options.body);
+      } catch {
+        payload = options.body;
+      }
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": "application/json",
-        ...options.headers,
+    const { data, error } = await supabase.functions.invoke("joggai-proxy", {
+      body: {
+        endpoint,
+        method,
+        payload,
+        apiKey: apiKey || undefined, // let proxy fall back to server env var
       },
     });
 
-    const data = await response.json();
+    if (error) {
+      throw new Error(`Supabase proxy error: ${error.message}`);
+    }
 
+    // The proxy returns the raw JoggAI response: { code, msg, data }
     if (data.code !== 0) {
       throw new Error(data.msg || "JoggAI API Fehler");
     }
 
-    return data.data;
+    return data.data as T;
   }
 
   // Validate API key
@@ -168,9 +182,9 @@ class JoggAiService {
 
   // Upload an asset and get the URL
   async uploadAsset(file: File): Promise<string> {
-    // Step 1: Get signed upload URL
+    // Step 1: Get signed upload URL (via proxy)
     const uploadInfo = await this.request<{ sign_url: string; asset_url: string }>(
-      "/upload/asset",
+      "/assets/upload_url",
       {
         method: "POST",
         body: JSON.stringify({
@@ -180,7 +194,7 @@ class JoggAiService {
       }
     );
 
-    // Step 2: Upload file to signed URL
+    // Step 2: Upload file to the signed URL (direct — this is cloud storage, not jogg.ai)
     await fetch(uploadInfo.sign_url, {
       method: "PUT",
       headers: {
