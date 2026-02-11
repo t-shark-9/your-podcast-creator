@@ -8,6 +8,8 @@ import { ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/i18n/LanguageContext";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 const Settings = () => {
   const [apiKey, setApiKey] = useState("");
@@ -15,6 +17,7 @@ const Settings = () => {
   const [isValid, setIsValid] = useState<boolean | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const savedApiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
@@ -45,14 +48,14 @@ const Settings = () => {
         localStorage.setItem("joggai_api_key", key);
         
         toast({
-          title: "API Key validiert",
-          description: `Verbunden als ${data.data?.email || data.data?.username}`,
+          title: t("settings.joggai.validated"),
+          description: `${t("settings.joggai.validated.desc")} ${data.data?.email || data.data?.username}`,
         });
       } else {
         setIsValid(false);
         toast({
-          title: "Ungültiger API Key",
-          description: data.msg || "Der API Key konnte nicht validiert werden.",
+          title: t("settings.joggai.invalid.title"),
+          description: data.msg || t("settings.joggai.invalid.desc"),
           variant: "destructive",
         });
       }
@@ -60,8 +63,8 @@ const Settings = () => {
       console.error("Validation error:", error);
       setIsValid(false);
       toast({
-        title: "Validierungsfehler",
-        description: error.message || "Verbindung zu JoggAI fehlgeschlagen.",
+        title: t("settings.joggai.error"),
+        description: error.message || t("settings.joggai.error.desc"),
         variant: "destructive",
       });
     } finally {
@@ -84,10 +87,11 @@ const Settings = () => {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Einstellungen</h1>
-            <p className="text-muted-foreground">API Konfiguration</p>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
+            <p className="text-muted-foreground">{t("settings.subtitle")}</p>
           </div>
+          <LanguageToggle />
         </div>
 
         {/* JoggAI API Key Card */}
@@ -95,9 +99,9 @@ const Settings = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>JoggAI API</CardTitle>
+                <CardTitle>{t("settings.joggai.title")}</CardTitle>
                 <CardDescription>
-                  Dein API Key für die Video-Generierung
+                  {t("settings.joggai.desc")}
                 </CardDescription>
               </div>
               {isValid !== null && (
@@ -105,12 +109,12 @@ const Settings = () => {
                   {isValid ? (
                     <>
                       <CheckCircle2 className="w-3 h-3" />
-                      Verbunden
+                      {t("settings.joggai.connected")}
                     </>
                   ) : (
                     <>
                       <AlertCircle className="w-3 h-3" />
-                      Ungültig
+                      {t("settings.joggai.invalid")}
                     </>
                   )}
                 </Badge>
@@ -119,17 +123,17 @@ const Settings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="api-key">API Key</Label>
+              <Label htmlFor="api-key">{t("settings.joggai.label")}</Label>
               <Input
                 id="api-key"
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Dein JoggAI API Key"
+                placeholder={t("settings.joggai.placeholder")}
               />
               {isValid && userEmail && (
                 <p className="text-sm text-muted-foreground">
-                  Verbunden als: {userEmail}
+                  {t("settings.joggai.connected.as")} {userEmail}
                 </p>
               )}
             </div>
@@ -138,10 +142,10 @@ const Settings = () => {
               {isValidating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Validiere...
+                  {t("settings.joggai.validate")}
                 </>
               ) : (
-                "Speichern & Validieren"
+                t("settings.joggai.save")
               )}
             </Button>
           </CardContent>

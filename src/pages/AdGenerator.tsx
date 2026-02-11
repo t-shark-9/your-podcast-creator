@@ -24,7 +24,8 @@ import {
   CheckCircle2,
   Settings,
   RefreshCw,
-  Mic
+  Mic,
+  LogIn
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,26 +34,33 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { AdProject, AdProjectStatus, CaptionStyle } from "@/types/podcast";
 
-const EXAMPLE_PROMPTS = [
+const EXAMPLE_PROMPTS_DE = [
   "Ein modernes Smartphone liegt auf einem minimalistischen Schreibtisch, Sonnenlicht fällt durch das Fenster",
   "Eine junge Frau joggt durch einen herbstlichen Park bei Sonnenaufgang",
   "Ein Kaffeebecher dampft in einem gemütlichen Café mit Regentropfen am Fenster",
   "Ein Elektroauto fährt durch eine futuristische Stadt bei Nacht mit Neonlichtern"
 ];
 
-const CAPTION_STYLES: { id: string; name: string; preview: string }[] = [
-  { id: "modern", name: "Modern", preview: "Weiß mit Schatten" },
-  { id: "bold", name: "Bold", preview: "Gelb auf Schwarz" },
-  { id: "minimal", name: "Minimal", preview: "Weiß transparent" },
-  { id: "dynamic", name: "Dynamisch", preview: "Animierte Wörter" }
+const EXAMPLE_PROMPTS_EN = [
+  "A modern smartphone sits on a minimalist desk, sunlight streaming through the window",
+  "A young woman jogs through an autumn park at sunrise",
+  "A coffee cup steams in a cozy café with raindrops on the window",
+  "An electric car drives through a futuristic city at night with neon lights"
 ];
 
-const MUSIC_GENRES = [
-  { id: "upbeat", name: "Upbeat", description: "Energisch & motivierend" },
-  { id: "chill", name: "Chill", description: "Entspannt & modern" },
-  { id: "cinematic", name: "Cinematic", description: "Episch & dramatisch" },
-  { id: "corporate", name: "Corporate", description: "Professionell & sauber" },
-  { id: "none", name: "Keine Musik", description: "Nur Originalton" }
+const CAPTION_STYLES: { id: string; name: string; preview_de: string; preview_en: string }[] = [
+  { id: "modern", name: "Modern", preview_de: "Weiß mit Schatten", preview_en: "White with shadow" },
+  { id: "bold", name: "Bold", preview_de: "Gelb auf Schwarz", preview_en: "Yellow on black" },
+  { id: "minimal", name: "Minimal", preview_de: "Weiß transparent", preview_en: "White transparent" },
+  { id: "dynamic", name: "Dynamic", preview_de: "Animierte Wörter", preview_en: "Animated words" }
+];
+
+const MUSIC_GENRES_DATA = [
+  { id: "upbeat", name: "Upbeat", desc_de: "Energisch & motivierend", desc_en: "Energetic & motivating" },
+  { id: "chill", name: "Chill", desc_de: "Entspannt & modern", desc_en: "Relaxed & modern" },
+  { id: "cinematic", name: "Cinematic", desc_de: "Episch & dramatisch", desc_en: "Epic & dramatic" },
+  { id: "corporate", name: "Corporate", desc_de: "Professionell & sauber", desc_en: "Professional & clean" },
+  { id: "none", name_de: "Keine Musik", name_en: "No Music", desc_de: "Nur Originalton", desc_en: "Original audio only" }
 ];
 
 export default function AdGenerator() {
@@ -72,7 +80,13 @@ export default function AdGenerator() {
   const [driveUrl, setDriveUrl] = useState("");
   
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const EXAMPLE_PROMPTS = language === "de" ? EXAMPLE_PROMPTS_DE : EXAMPLE_PROMPTS_EN;
+  const MUSIC_GENRES = MUSIC_GENRES_DATA.map(g => ({
+    id: g.id,
+    name: g.id === "none" ? (language === "de" ? g.name_de : g.name_en) : g.name,
+    description: language === "de" ? g.desc_de : g.desc_en
+  }));
 
   // Simulate progress during generation
   useEffect(() => {
@@ -92,8 +106,8 @@ export default function AdGenerator() {
   const enhancePrompt = async () => {
     if (!prompt.trim()) {
       toast({
-        title: "Prompt fehlt",
-        description: "Bitte beschreibe zuerst dein Video.",
+        title: t("ads.prompt.missing"),
+        description: t("ads.prompt.missing.desc"),
         variant: "destructive"
       });
       return;
@@ -115,8 +129,8 @@ export default function AdGenerator() {
       setStatus("draft");
 
       toast({
-        title: "Prompt verbessert!",
-        description: "Der Prompt wurde für bessere Videoqualität optimiert."
+        title: t("ads.prompt.enhanced"),
+        description: t("ads.prompt.enhanced.desc")
       });
 
     } catch (error) {
@@ -127,8 +141,8 @@ export default function AdGenerator() {
       setStatus("draft");
       
       toast({
-        title: "Prompt verbessert (lokal)",
-        description: "Der Prompt wurde lokal optimiert."
+        title: t("ads.prompt.enhanced.local"),
+        description: t("ads.prompt.enhanced.local.desc")
       });
     } finally {
       setIsEnhancing(false);
@@ -139,8 +153,8 @@ export default function AdGenerator() {
     const finalPrompt = enhancedPrompt || prompt;
     if (!finalPrompt.trim()) {
       toast({
-        title: "Prompt fehlt",
-        description: "Bitte beschreibe zuerst dein Video.",
+        title: t("ads.prompt.missing"),
+        description: t("ads.prompt.missing.desc"),
         variant: "destructive"
       });
       return;
@@ -150,8 +164,8 @@ export default function AdGenerator() {
     
     if (!apiKey) {
       toast({
-        title: "API Key fehlt",
-        description: "Bitte konfiguriere deinen JoggAI API Key in den Einstellungen.",
+        title: t("ads.apikey.missing"),
+        description: t("ads.apikey.missing.desc"),
         variant: "destructive",
       });
       return;
@@ -202,8 +216,8 @@ export default function AdGenerator() {
       const videoId = data.data.video_id;
       
       toast({
-        title: "Video wird generiert",
-        description: "Das dauert etwa 2-5 Minuten.",
+        title: t("ads.status.generating"),
+        description: t("ads.progress"),
       });
 
       // Start polling for video status
@@ -212,8 +226,8 @@ export default function AdGenerator() {
     } catch (error) {
       console.error('Error generating video:', error);
       toast({
-        title: "Fehler bei der Video-Generierung",
-        description: error instanceof Error ? error.message : "Das Video konnte nicht erstellt werden.",
+        title: t("ads.video.error"),
+        description: error instanceof Error ? error.message : t("ads.video.error.desc"),
         variant: "destructive"
       });
       setStatus("failed");
@@ -237,15 +251,15 @@ export default function AdGenerator() {
           setStatus("adding_captions");
           setIsGenerating(false);
           toast({
-            title: "Video generiert!",
-            description: "Jetzt kannst du Untertitel und Musik hinzufügen."
+            title: t("ads.video.generated"),
+            description: t("ads.video.generated.desc")
           });
         } else if (data.data?.status === "failed") {
           clearInterval(interval);
           setStatus("failed");
           setIsGenerating(false);
           toast({
-            title: "Video-Generierung fehlgeschlagen",
+            title: t("ads.video.failed"),
             variant: "destructive"
           });
         }
@@ -258,8 +272,8 @@ export default function AdGenerator() {
   const addCaptionsAndMusic = async () => {
     if (!rawVideoUrl) {
       toast({
-        title: "Kein Video",
-        description: "Bitte generiere zuerst ein Video.",
+        title: t("ads.no.video"),
+        description: t("ads.no.video.desc"),
         variant: "destructive"
       });
       return;
@@ -284,8 +298,8 @@ export default function AdGenerator() {
       setStatus("completed");
 
       toast({
-        title: "Video fertig!",
-        description: "Untertitel und Musik wurden hinzugefügt."
+        title: t("ads.video.ready"),
+        description: t("ads.video.ready.desc")
       });
 
     } catch (error) {
@@ -294,8 +308,8 @@ export default function AdGenerator() {
       setCaptionedVideoUrl(rawVideoUrl);
       setStatus("completed");
       toast({
-        title: "Video fertig",
-        description: "Das Video ist bereit (ohne zusätzliche Bearbeitung)."
+        title: t("ads.video.ready.fallback"),
+        description: t("ads.video.ready.fallback.desc")
       });
     } finally {
       setIsGenerating(false);
@@ -306,8 +320,8 @@ export default function AdGenerator() {
     const videoUrl = captionedVideoUrl || rawVideoUrl;
     if (!videoUrl) {
       toast({
-        title: "Kein Video",
-        description: "Bitte erstelle zuerst ein Video.",
+        title: t("ads.no.video"),
+        description: t("ads.no.video.desc"),
         variant: "destructive"
       });
       return;
@@ -331,15 +345,15 @@ export default function AdGenerator() {
       setStatus("completed");
 
       toast({
-        title: "In Google Drive gespeichert!",
-        description: "Das Video wurde in deinem Google Drive gespeichert."
+        title: t("ads.drive.saved"),
+        description: t("ads.drive.saved.desc")
       });
 
     } catch (error) {
       console.error('Error saving to drive:', error);
       toast({
-        title: "Fehler beim Speichern",
-        description: "Das Video konnte nicht in Google Drive gespeichert werden. Du kannst es manuell herunterladen.",
+        title: t("ads.drive.error"),
+        description: t("ads.drive.error.desc"),
         variant: "destructive"
       });
       setStatus("completed");
@@ -395,6 +409,12 @@ export default function AdGenerator() {
             </div>
             <div className="flex items-center gap-2">
               <LanguageToggle />
+              <Link to="/auth">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <LogIn className="w-4 h-4" />
+                  {t("nav.login")}
+                </Button>
+              </Link>
               <Link to="/">
                 <Button variant="ghost" size="sm" className="gap-2">
                   {t("nav.home")}
@@ -418,15 +438,15 @@ export default function AdGenerator() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
-                  Video beschreiben
+                  {t("ads.step1.title")}
                 </CardTitle>
                 <CardDescription>
-                  Beschreibe das Video, das du erstellen möchtest. Die KI verbessert deinen Prompt automatisch.
+                  {t("ads.step1.desc")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder="z.B. Eine Person öffnet ein Paket mit einem neuen Produkt und zeigt ihre begeisterte Reaktion..."
+                  placeholder={t("ads.placeholder")}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   className="min-h-[100px]"
@@ -458,14 +478,14 @@ export default function AdGenerator() {
                   ) : (
                     <Wand2 className="w-4 h-4" />
                   )}
-                  Prompt verbessern
+                  {t("ads.enhance")}
                 </Button>
 
                 {enhancedPrompt && (
                   <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="w-4 h-4 text-primary" />
-                      <span className="font-medium text-sm">Verbesserter Prompt:</span>
+                      <span className="font-medium text-sm">{t("ads.enhanced")}</span>
                     </div>
                     <Textarea
                       value={enhancedPrompt}
@@ -484,12 +504,12 @@ export default function AdGenerator() {
                   {isGenerating || status === "generating_video" ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Video wird generiert...
+                      {t("ads.generating")}
                     </>
                   ) : (
                     <>
                       <Video className="w-4 h-4" />
-                      Video generieren
+                      {t("ads.generate")}
                     </>
                   )}
                 </Button>
@@ -498,7 +518,7 @@ export default function AdGenerator() {
                   <div className="space-y-2">
                     <Progress value={progress} className="h-2" />
                     <p className="text-xs text-muted-foreground text-center">
-                      Video wird generiert... (~2-5 Minuten)
+                      {t("ads.progress")}
                     </p>
                   </div>
                 )}
@@ -511,20 +531,20 @@ export default function AdGenerator() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
-                    Untertitel & Musik
+                    {t("ads.step2.title")}
                   </CardTitle>
                   <CardDescription>
-                    Füge automatische Untertitel und Hintergrundmusik hinzu.
+                    {t("ads.step2.desc")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
                       <Type className="w-4 h-4" />
-                      Untertitel-Text (optional)
+                      {t("ads.captions.text")}
                     </Label>
                     <Textarea
-                      placeholder="Leer lassen für automatische Transkription oder Text eingeben..."
+                      placeholder={t("ads.captions.placeholder")}
                       value={captionText}
                       onChange={(e) => setCaptionText(e.target.value)}
                       className="min-h-[60px]"
@@ -533,7 +553,7 @@ export default function AdGenerator() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Untertitel-Stil</Label>
+                      <Label>{t("ads.captions.style")}</Label>
                       <Select value={selectedCaptionStyle} onValueChange={setSelectedCaptionStyle}>
                         <SelectTrigger>
                           <SelectValue />
@@ -541,7 +561,7 @@ export default function AdGenerator() {
                         <SelectContent>
                           {CAPTION_STYLES.map(style => (
                             <SelectItem key={style.id} value={style.id}>
-                              {style.name} - {style.preview}
+                              {style.name} - {language === "de" ? style.preview_de : style.preview_en}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -551,7 +571,7 @@ export default function AdGenerator() {
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
                         <Music className="w-4 h-4" />
-                        Hintergrundmusik
+                        {t("ads.music")}
                       </Label>
                       <Select value={selectedMusicGenre} onValueChange={setSelectedMusicGenre}>
                         <SelectTrigger>
@@ -576,12 +596,12 @@ export default function AdGenerator() {
                     {isGenerating && status === "adding_captions" ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Wird bearbeitet...
+                        {t("ads.captions.processing")}
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        Untertitel & Musik hinzufügen
+                        {t("ads.captions.apply")}
                       </>
                     )}
                   </Button>
@@ -595,25 +615,25 @@ export default function AdGenerator() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">3</span>
-                    Speichern & Exportieren
+                    {t("ads.step3.title")}
                   </CardTitle>
                   <CardDescription>
-                    Speichere das Video in Google Drive oder lade es herunter.
+                    {t("ads.step3.desc")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
                       <FolderOpen className="w-4 h-4" />
-                      Google Drive Ordner-ID (optional)
+                      {t("ads.drive.folder")}
                     </Label>
                     <Input
-                      placeholder="z.B. 1ABC...xyz (aus der URL deines Drive-Ordners)"
+                      placeholder={t("ads.drive.folder.placeholder")}
                       value={googleDriveFolderId}
                       onChange={(e) => setGoogleDriveFolderId(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Die Ordner-ID findest du in der URL deines Google Drive Ordners
+                      {t("ads.drive.folder.hint")}
                     </p>
                   </div>
 
@@ -626,12 +646,12 @@ export default function AdGenerator() {
                       {isSavingToDrive ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Wird hochgeladen...
+                          {t("ads.drive.saving")}
                         </>
                       ) : (
                         <>
                           <FolderOpen className="w-4 h-4" />
-                          In Google Drive speichern
+                          {t("ads.drive.save")}
                         </>
                       )}
                     </Button>
@@ -641,21 +661,21 @@ export default function AdGenerator() {
                       className="gap-2"
                     >
                       <Download className="w-4 h-4" />
-                      Herunterladen
+                      {t("ads.download")}
                     </Button>
                   </div>
 
                   {driveUrl && (
                     <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      <span className="text-sm">Gespeichert!</span>
+                      <span className="text-sm">{t("ads.drive.saved.badge")}</span>
                       <a 
                         href={driveUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-sm text-primary hover:underline flex items-center gap-1 ml-auto"
                       >
-                        In Drive öffnen
+                        {t("ads.drive.open")}
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
@@ -669,7 +689,7 @@ export default function AdGenerator() {
           <div className="space-y-6">
             <Card className="sticky top-24">
               <CardHeader>
-                <CardTitle className="text-base">Video-Vorschau</CardTitle>
+                <CardTitle className="text-base">{t("ads.preview")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {(captionedVideoUrl || rawVideoUrl) ? (
@@ -690,7 +710,7 @@ export default function AdGenerator() {
                         onClick={() => window.open(captionedVideoUrl || rawVideoUrl, "_blank")}
                       >
                         <ExternalLink className="w-3 h-3" />
-                        Vollbild
+                        {t("ads.fullscreen")}
                       </Button>
                       <Button
                         variant="outline"
@@ -707,8 +727,8 @@ export default function AdGenerator() {
                   <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
                       <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">Noch kein Video</p>
-                      <p className="text-xs">Erstelle ein Video um die Vorschau zu sehen</p>
+                      <p className="text-sm">{t("ads.preview.empty")}</p>
+                      <p className="text-xs">{t("ads.preview.empty.desc")}</p>
                     </div>
                   </div>
                 )}
@@ -718,17 +738,17 @@ export default function AdGenerator() {
             {/* Workflow Progress */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Workflow</CardTitle>
+                <CardTitle className="text-base">{t("ads.workflow")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { key: "draft", label: "Video beschreiben", icon: Type },
-                    { key: "enhancing_prompt", label: "Prompt verbessern", icon: Wand2 },
-                    { key: "generating_video", label: "Video generieren", icon: Video },
-                    { key: "adding_captions", label: "Untertitel & Musik", icon: Music },
-                    { key: "uploading_drive", label: "In Drive speichern", icon: FolderOpen },
-                    { key: "completed", label: "Fertig!", icon: CheckCircle2 }
+                    { key: "draft", label: t("ads.workflow.describe"), icon: Type },
+                    { key: "enhancing_prompt", label: t("ads.workflow.enhance"), icon: Wand2 },
+                    { key: "generating_video", label: t("ads.workflow.generate"), icon: Video },
+                    { key: "adding_captions", label: t("ads.workflow.captions"), icon: Music },
+                    { key: "uploading_drive", label: t("ads.workflow.drive"), icon: FolderOpen },
+                    { key: "completed", label: t("ads.workflow.done"), icon: CheckCircle2 }
                   ].map((step, index) => {
                     const Icon = step.icon;
                     const statusOrder = ["draft", "enhancing_prompt", "generating_video", "adding_captions", "uploading_drive", "completed"];

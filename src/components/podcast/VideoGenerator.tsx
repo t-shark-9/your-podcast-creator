@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, Video, CheckCircle2, AlertCircle, Download, ExternalLink, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/i18n/LanguageContext";
 import type { DialogueLine } from "@/types/podcast";
 import type { PodcastSpeakerConfig } from "@/lib/joggai";
 
@@ -38,6 +39,7 @@ export default function VideoGenerator({
   const [progress, setProgress] = useState(0);
   
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -103,8 +105,8 @@ export default function VideoGenerator({
     
     if (!apiKey) {
       toast({
-        title: "API Key fehlt",
-        description: "Bitte konfiguriere deinen JoggAI API Key in den Einstellungen.",
+        title: t("video.apikey.missing"),
+        description: t("video.apikey.missing.desc"),
         variant: "destructive",
       });
       return;
@@ -112,8 +114,8 @@ export default function VideoGenerator({
 
     if (dialogue.length === 0) {
       toast({
-        title: "Kein Dialog",
-        description: "Bitte erstelle zuerst einen Podcast-Dialog.",
+        title: t("video.no.dialogue"),
+        description: t("video.no.dialogue.desc"),
         variant: "destructive",
       });
       return;
@@ -229,8 +231,8 @@ export default function VideoGenerator({
       });
 
       toast({
-        title: "Video wird generiert",
-        description: "Das dauert etwa 2-5 Minuten. Du kannst den Fortschritt hier verfolgen.",
+        title: t("video.started"),
+        description: t("video.started.desc"),
       });
 
       // Start polling for status
@@ -239,8 +241,8 @@ export default function VideoGenerator({
     } catch (error) {
       console.error("Video generation error:", error);
       toast({
-        title: "Fehler bei der Video-Generierung",
-        description: error instanceof Error ? error.message : "Das Video konnte nicht erstellt werden.",
+        title: t("video.error"),
+        description: error instanceof Error ? error.message : t("video.error.desc"),
         variant: "destructive",
       });
       setVideoJob(null);
@@ -294,15 +296,15 @@ export default function VideoGenerator({
           clearInterval(interval);
           setPollingInterval(null);
           toast({
-            title: "Video fertig!",
-            description: "Dein Podcast-Video wurde erfolgreich erstellt.",
+            title: t("video.completed"),
+            description: t("video.completed.desc"),
           });
         } else if (status === "failed") {
           clearInterval(interval);
           setPollingInterval(null);
           toast({
-            title: "Video-Generierung fehlgeschlagen",
-            description: "Bitte versuche es erneut.",
+            title: t("video.failed"),
+            description: t("video.failed.desc"),
             variant: "destructive",
           });
         }
@@ -322,21 +324,21 @@ export default function VideoGenerator({
         return (
           <Badge variant="secondary" className="gap-1">
             <Loader2 className="w-3 h-3 animate-spin" />
-            Wird generiert...
+            {t("video.badge.processing")}
           </Badge>
         );
       case "completed":
         return (
           <Badge variant="default" className="gap-1 bg-green-500">
             <CheckCircle2 className="w-3 h-3" />
-            Fertig
+            {t("video.badge.completed")}
           </Badge>
         );
       case "failed":
         return (
           <Badge variant="destructive" className="gap-1">
             <AlertCircle className="w-3 h-3" />
-            Fehlgeschlagen
+            {t("video.badge.failed")}
           </Badge>
         );
       default:
@@ -351,10 +353,10 @@ export default function VideoGenerator({
           <div>
             <CardTitle className="flex items-center gap-2">
               <Video className="w-5 h-5" />
-              Video generieren
+              {t("video.title")}
             </CardTitle>
             <CardDescription>
-              Erstelle ein Podcast-Video mit zwei KI-Avataren im Splitscreen
+              {t("video.desc")}
             </CardDescription>
           </div>
           {getStatusBadge()}
@@ -365,8 +367,7 @@ export default function VideoGenerator({
           <>
             <div className="p-4 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                <strong>{dialogue.length}</strong> Dialogzeilen bereit für die Video-Generierung.
-                Das Video wird mit zwei KI-Avataren im Splitscreen erstellt, die abwechselnd sprechen.
+                <strong>{dialogue.length}</strong> {t("video.ready.count")}
               </p>
             </div>
             
@@ -379,12 +380,12 @@ export default function VideoGenerator({
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Video wird erstellt...
+                  {t("video.generating")}
                 </>
               ) : (
                 <>
                   <Video className="w-4 h-4" />
-                  Video generieren
+                  {t("video.generate")}
                 </>
               )}
             </Button>
@@ -395,7 +396,7 @@ export default function VideoGenerator({
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Video wird generiert... Dies dauert etwa 2-5 Minuten.
+              {t("video.processing")}
             </div>
             <Progress value={progress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
@@ -431,7 +432,7 @@ export default function VideoGenerator({
                 onClick={() => window.open(videoJob.videoUrl, "_blank")}
               >
                 <ExternalLink className="w-4 h-4" />
-                Video ansehen
+                {t("video.watch")}
               </Button>
               <Button 
                 className="flex-1 gap-2"
@@ -443,7 +444,7 @@ export default function VideoGenerator({
                 }}
               >
                 <Download className="w-4 h-4" />
-                Herunterladen
+                {t("video.download")}
               </Button>
             </div>
 
@@ -456,7 +457,7 @@ export default function VideoGenerator({
               }}
               className="w-full"
             >
-              Neues Video erstellen
+              {t("video.new")}
             </Button>
           </div>
         )}
@@ -465,7 +466,7 @@ export default function VideoGenerator({
           <div className="space-y-4">
             <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
               <p className="text-sm text-red-500">
-                Die Video-Generierung ist fehlgeschlagen. Bitte versuche es erneut.
+                {t("video.failed.message")}
               </p>
             </div>
             <Button
@@ -475,7 +476,7 @@ export default function VideoGenerator({
               }}
               className="w-full"
             >
-              Erneut versuchen
+              {t("video.retry")}
             </Button>
           </div>
         )}

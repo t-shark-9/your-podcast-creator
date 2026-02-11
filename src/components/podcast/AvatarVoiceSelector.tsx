@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, User, Mic, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { joggAiService, JoggAiAvatar, JoggAiVoice, PodcastSpeakerConfig } from "@/lib/joggai";
 
 interface AvatarVoiceSelectorProps {
@@ -43,6 +44,7 @@ export default function AvatarVoiceSelector({
   const [speaker2Voice, setSpeaker2Voice] = useState<string>("");
 
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   useEffect(() => {
     loadResources();
@@ -85,8 +87,8 @@ export default function AvatarVoiceSelector({
     } catch (error) {
       console.error("Error loading JoggAI resources:", error);
       toast({
-        title: "Fehler beim Laden",
-        description: error instanceof Error ? error.message : "Die Ressourcen konnten nicht geladen werden.",
+        title: t("avs.error"),
+        description: error instanceof Error ? error.message : t("avs.error.desc"),
         variant: "destructive",
       });
     } finally {
@@ -111,8 +113,8 @@ export default function AvatarVoiceSelector({
   const handleContinue = () => {
     if (!speaker1Avatar || !speaker1Voice || !speaker2Avatar || !speaker2Voice) {
       toast({
-        title: "Unvollständige Auswahl",
-        description: "Bitte wähle für beide Sprecher einen Avatar und eine Stimme aus.",
+        title: t("avs.incomplete"),
+        description: t("avs.incomplete.desc"),
         variant: "destructive",
       });
       return;
@@ -159,17 +161,17 @@ export default function AvatarVoiceSelector({
         <CardContent className="py-8 text-center space-y-4">
           <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground" />
           <div>
-            <h3 className="font-semibold">JoggAI API nicht konfiguriert</h3>
+            <h3 className="font-semibold">{t("avs.noapi")}</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Um Avatare und Stimmen auszuwählen, konfiguriere bitte zuerst deinen JoggAI API Key in den Einstellungen.
+              {t("avs.noapi.desc")}
             </p>
           </div>
           <Button variant="outline" onClick={() => window.location.href = '/settings'}>
-            Zu den Einstellungen
+            {t("avs.goto.settings")}
           </Button>
           {onSkip && (
             <Button variant="ghost" onClick={onSkip}>
-              Überspringen
+              {t("avs.skip")}
             </Button>
           )}
         </CardContent>
@@ -182,7 +184,7 @@ export default function AvatarVoiceSelector({
       <Card className="border-border/50 bg-card/50">
         <CardContent className="py-12 text-center space-y-4">
           <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
-          <p className="text-muted-foreground">Lade Avatare und Stimmen...</p>
+          <p className="text-muted-foreground">{t("avs.loading")}</p>
         </CardContent>
       </Card>
     );
@@ -202,10 +204,10 @@ export default function AvatarVoiceSelector({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <User className="w-5 h-5" />
-          Sprecher konfigurieren
+          {t("avs.title")}
         </CardTitle>
         <CardDescription>
-          Wähle für jeden Sprecher einen Avatar und eine Stimme aus
+          {t("avs.desc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -214,7 +216,7 @@ export default function AvatarVoiceSelector({
           <div className="flex items-center justify-between">
             <h3 className="font-semibold flex items-center gap-2">
               <Badge variant="secondary">1</Badge>
-              Sprecher 1
+              {t("avs.speaker1")}
             </h3>
             {speaker1Avatar && speaker1Voice && (
               <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -222,29 +224,29 @@ export default function AvatarVoiceSelector({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="speaker1-name">Name</Label>
+            <Label htmlFor="speaker1-name">{t("avs.name")}</Label>
             <Input
               id="speaker1-name"
               value={speaker1Name}
               onChange={(e) => onSpeaker1NameChange(e.target.value)}
-              placeholder="Name des Sprechers"
+              placeholder={t("avs.name.placeholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Avatar</Label>
+            <Label>{t("avs.avatar")}</Label>
             <Select
               value={speaker1AvatarType === 1 ? `photo_${speaker1Avatar}` : speaker1Avatar}
               onValueChange={(val) => handleAvatarChange(1, val)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Avatar auswählen" />
+                <SelectValue placeholder={t("avs.avatar.placeholder")} />
               </SelectTrigger>
               <SelectContent className="max-h-60">
                 {photoAvatars.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      Eigene Avatare
+                      {t("avs.avatar.own")}
                     </div>
                     {photoAvatars.map((avatar) => (
                       <SelectItem key={`photo_${avatar.avatar_id}`} value={`photo_${avatar.avatar_id}`}>
@@ -254,7 +256,7 @@ export default function AvatarVoiceSelector({
                   </>
                 )}
                 <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                  Public Avatare
+                  {t("avs.avatar.public")}
                 </div>
                 {publicAvatars.slice(0, 50).map((avatar) => (
                   <SelectItem key={String(avatar.avatar_id)} value={String(avatar.avatar_id)}>
@@ -266,16 +268,16 @@ export default function AvatarVoiceSelector({
           </div>
 
           <div className="space-y-2">
-            <Label>Stimme</Label>
+            <Label>{t("avs.voice")}</Label>
             <Select value={speaker1Voice} onValueChange={setSpeaker1Voice}>
               <SelectTrigger>
-                <SelectValue placeholder="Stimme auswählen" />
+                <SelectValue placeholder={t("avs.voice.placeholder")} />
               </SelectTrigger>
               <SelectContent className="max-h-60">
                 {germanVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      Deutsch
+                      {t("avs.voice.german")}
                     </div>
                     {germanVoices.map((voice) => (
                       <SelectItem key={voice.voice_id} value={voice.voice_id}>
@@ -287,7 +289,7 @@ export default function AvatarVoiceSelector({
                 {englishVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      English
+                      {t("avs.voice.english")}
                     </div>
                     {englishVoices.slice(0, 30).map((voice) => (
                       <SelectItem key={voice.voice_id} value={voice.voice_id}>
@@ -299,7 +301,7 @@ export default function AvatarVoiceSelector({
                 {otherVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      Andere Sprachen
+                      {t("avs.voice.other")}
                     </div>
                     {otherVoices.slice(0, 30).map((voice) => (
                       <SelectItem key={voice.voice_id} value={voice.voice_id}>
@@ -318,7 +320,7 @@ export default function AvatarVoiceSelector({
           <div className="flex items-center justify-between">
             <h3 className="font-semibold flex items-center gap-2">
               <Badge variant="secondary">2</Badge>
-              Sprecher 2
+              {t("avs.speaker2")}
             </h3>
             {speaker2Avatar && speaker2Voice && (
               <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -326,29 +328,29 @@ export default function AvatarVoiceSelector({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="speaker2-name">Name</Label>
+            <Label htmlFor="speaker2-name">{t("avs.name")}</Label>
             <Input
               id="speaker2-name"
               value={speaker2Name}
               onChange={(e) => onSpeaker2NameChange(e.target.value)}
-              placeholder="Name des Sprechers"
+              placeholder={t("avs.name.placeholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Avatar</Label>
+            <Label>{t("avs.avatar")}</Label>
             <Select
               value={speaker2AvatarType === 1 ? `photo_${speaker2Avatar}` : speaker2Avatar}
               onValueChange={(val) => handleAvatarChange(2, val)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Avatar auswählen" />
+                <SelectValue placeholder={t("avs.avatar.placeholder")} />
               </SelectTrigger>
               <SelectContent className="max-h-60">
                 {photoAvatars.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      Eigene Avatare
+                      {t("avs.avatar.own")}
                     </div>
                     {photoAvatars.map((avatar) => (
                       <SelectItem key={`photo_${avatar.avatar_id}`} value={`photo_${avatar.avatar_id}`}>
@@ -358,7 +360,7 @@ export default function AvatarVoiceSelector({
                   </>
                 )}
                 <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                  Public Avatare
+                  {t("avs.avatar.public")}
                 </div>
                 {publicAvatars.slice(0, 50).map((avatar) => (
                   <SelectItem key={String(avatar.avatar_id)} value={String(avatar.avatar_id)}>
@@ -370,16 +372,16 @@ export default function AvatarVoiceSelector({
           </div>
 
           <div className="space-y-2">
-            <Label>Stimme</Label>
+            <Label>{t("avs.voice")}</Label>
             <Select value={speaker2Voice} onValueChange={setSpeaker2Voice}>
               <SelectTrigger>
-                <SelectValue placeholder="Stimme auswählen" />
+                <SelectValue placeholder={t("avs.voice.placeholder")} />
               </SelectTrigger>
               <SelectContent className="max-h-60">
                 {germanVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      Deutsch
+                      {t("avs.voice.german")}
                     </div>
                     {germanVoices.map((voice) => (
                       <SelectItem key={voice.voice_id} value={voice.voice_id}>
@@ -391,7 +393,7 @@ export default function AvatarVoiceSelector({
                 {englishVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      English
+                      {t("avs.voice.english")}
                     </div>
                     {englishVoices.slice(0, 30).map((voice) => (
                       <SelectItem key={voice.voice_id} value={voice.voice_id}>
@@ -403,7 +405,7 @@ export default function AvatarVoiceSelector({
                 {otherVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      Andere Sprachen
+                      {t("avs.voice.other")}
                     </div>
                     {otherVoices.slice(0, 30).map((voice) => (
                       <SelectItem key={voice.voice_id} value={voice.voice_id}>
@@ -425,11 +427,11 @@ export default function AvatarVoiceSelector({
             className="gap-2"
           >
             <RefreshCw className="w-4 h-4" />
-            Neu laden
+            {t("avs.reload")}
           </Button>
           {onSkip && (
             <Button variant="ghost" onClick={onSkip}>
-              Überspringen
+              {t("avs.skip")}
             </Button>
           )}
           <Button
@@ -438,7 +440,7 @@ export default function AvatarVoiceSelector({
             disabled={!speaker1Avatar || !speaker1Voice || !speaker2Avatar || !speaker2Voice}
           >
             <CheckCircle2 className="w-4 h-4" />
-            Weiter
+            {t("avs.continue")}
           </Button>
         </div>
       </CardContent>

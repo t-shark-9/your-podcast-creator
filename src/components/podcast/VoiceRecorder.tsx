@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Loader2, Mic, Square, Upload, Check, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/i18n/LanguageContext";
 import type { Voice } from "@/types/podcast";
 
 interface VoiceRecorderProps {
@@ -12,8 +13,6 @@ interface VoiceRecorderProps {
   onVoiceDeleted: (voiceId: string) => void;
   isUploading: boolean;
 }
-
-const SAMPLE_TEXT = "Hallo! Das ist ein Beispieltext für die Stimmaufnahme. Bitte lies diesen Text langsam und deutlich vor, damit deine Stimme gut erkannt wird. Die Aufnahme sollte etwa fünfzehn Sekunden dauern.";
 
 export const VoiceRecorder = ({
   voices,
@@ -32,6 +31,7 @@ export const VoiceRecorder = ({
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const startRecording = async () => {
     try {
@@ -63,8 +63,8 @@ export const VoiceRecorder = ({
 
     } catch (error) {
       toast({
-        title: "Mikrofon-Fehler",
-        description: "Bitte erlaube den Zugriff auf dein Mikrofon.",
+        title: t("voice.mic.error"),
+        description: t("voice.mic.error.desc"),
         variant: "destructive"
       });
     }
@@ -84,8 +84,8 @@ export const VoiceRecorder = ({
   const handleSaveVoice = async () => {
     if (!audioBlob || !voiceName.trim()) {
       toast({
-        title: "Fehler",
-        description: "Bitte nimm eine Aufnahme auf und gib einen Namen ein.",
+        title: t("voice.save.error"),
+        description: t("voice.save.error.desc"),
         variant: "destructive"
       });
       return;
@@ -109,8 +109,8 @@ export const VoiceRecorder = ({
     setShowNewVoice(false);
     
     toast({
-      title: "Stimme gespeichert",
-      description: `"${newVoice.name}" wurde erfolgreich hinzugefügt.`
+      title: t("voice.saved"),
+      description: `"${newVoice.name}" ${t("voice.saved.desc")}`
     });
   };
 
@@ -131,10 +131,10 @@ export const VoiceRecorder = ({
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Mic className="w-5 h-5" />
-          Meine Stimmen
+          {t("voice.title")}
         </CardTitle>
         <CardDescription>
-          Nimm deine Stimme auf, um sie für den Podcast zu verwenden.
+          {t("voice.desc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -151,7 +151,7 @@ export const VoiceRecorder = ({
                   <span className="font-medium">{voice.name}</span>
                   {voice.isUploaded && (
                     <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                      Hochgeladen
+                      {t("voice.uploaded")}
                     </span>
                   )}
                 </div>
@@ -177,18 +177,18 @@ export const VoiceRecorder = ({
         {showNewVoice ? (
           <div className="space-y-4 p-4 rounded-lg border border-dashed border-border">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name der Stimme</label>
+              <label className="text-sm font-medium">{t("voice.name.label")}</label>
               <Input
                 value={voiceName}
                 onChange={(e) => setVoiceName(e.target.value)}
-                placeholder="z.B. Meine Stimme, Moderator, etc."
+                placeholder={t("voice.name.placeholder")}
               />
             </div>
 
             {/* Sample text to read */}
             <div className="p-3 rounded-lg bg-muted/50 text-sm">
-              <p className="font-medium mb-1">Bitte lies diesen Text vor:</p>
-              <p className="text-muted-foreground italic">{SAMPLE_TEXT}</p>
+              <p className="font-medium mb-1">{t("voice.sample.title")}</p>
+              <p className="text-muted-foreground italic">{t("voice.sample.text")}</p>
             </div>
 
             {/* Recording controls */}
@@ -203,12 +203,12 @@ export const VoiceRecorder = ({
                     {isRecording ? (
                       <>
                         <Square className="w-4 h-4" />
-                        Stoppen
+                        {t("voice.record.stop")}
                       </>
                     ) : (
                       <>
                         <Mic className="w-4 h-4" />
-                        Aufnahme starten
+                        {t("voice.record.start")}
                       </>
                     )}
                   </Button>
@@ -223,7 +223,7 @@ export const VoiceRecorder = ({
                 <div className="flex items-center gap-4 w-full">
                   <audio src={audioUrl!} controls className="flex-1" />
                   <Button variant="outline" size="sm" onClick={resetRecording}>
-                    Neu aufnehmen
+                    {t("voice.record.again")}
                   </Button>
                 </div>
               )}
@@ -236,7 +236,7 @@ export const VoiceRecorder = ({
                 resetRecording();
                 setVoiceName("");
               }}>
-                Abbrechen
+                {t("voice.cancel")}
               </Button>
               <Button
                 onClick={handleSaveVoice}
@@ -248,7 +248,7 @@ export const VoiceRecorder = ({
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                Stimme speichern
+                {t("voice.save")}
               </Button>
             </div>
           </div>
@@ -259,7 +259,7 @@ export const VoiceRecorder = ({
             className="w-full gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neue Stimme hinzufügen
+            {t("voice.add")}
           </Button>
         )}
       </CardContent>

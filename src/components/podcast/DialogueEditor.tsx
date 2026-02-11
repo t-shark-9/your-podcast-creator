@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Trash2, Minus, Plus, Wand2, Download, ArrowLeft, User, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/i18n/LanguageContext";
 import VideoGenerator from "@/components/podcast/VideoGenerator";
 import type { DialogueLine, Voice, Avatar } from "@/types/podcast";
 import type { PodcastSpeakerConfig } from "@/lib/joggai";
@@ -50,6 +51,7 @@ export const DialogueEditor = ({
   const [editInstructions, setEditInstructions] = useState<Record<string, string>>({});
   const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleTextChange = (lineId: string, newText: string) => {
     const updated = dialogue.map(line => 
@@ -74,8 +76,8 @@ export const DialogueEditor = ({
     const instruction = editInstructions[lineId];
     if (!instruction?.trim()) {
       toast({
-        title: "Anweisung fehlt",
-        description: "Bitte beschreibe, wie der Text geändert werden soll.",
+        title: t("editor.edit.missing"),
+        description: t("editor.edit.missing.desc"),
         variant: "destructive"
       });
       return;
@@ -104,15 +106,15 @@ export const DialogueEditor = ({
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Dialog bearbeiten</h1>
+              <h1 className="text-2xl font-bold">{t("editor.title")}</h1>
               <p className="text-sm text-muted-foreground">
-                {dialogue.length} Dialogzeilen
+                {dialogue.length} {t("editor.lines")}
               </p>
             </div>
           </div>
           <Button onClick={onExport} className="gap-2">
             <Download className="w-4 h-4" />
-            Als .txt exportieren
+            {t("editor.export")}
           </Button>
         </div>
 
@@ -121,25 +123,25 @@ export const DialogueEditor = ({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <User className="w-4 h-4" />
-              Sprecher konfigurieren
+              {t("editor.speaker.config")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-primary">Sprecher 1</label>
+                <label className="text-sm font-medium text-primary">{t("editor.speaker1")}</label>
                 <Input
                   value={speaker1Name}
                   onChange={(e) => onSpeakerNameChange("speaker1", e.target.value)}
-                  placeholder="Name Sprecher 1"
+                  placeholder={t("editor.speaker1.placeholder")}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-purple-500">Sprecher 2</label>
+                <label className="text-sm font-medium text-purple-500">{t("editor.speaker2")}</label>
                 <Input
                   value={speaker2Name}
                   onChange={(e) => onSpeakerNameChange("speaker2", e.target.value)}
-                  placeholder="Name Sprecher 2"
+                  placeholder={t("editor.speaker2.placeholder")}
                 />
               </div>
             </div>
@@ -183,7 +185,7 @@ export const DialogueEditor = ({
                       onValueChange={(value) => handleVoiceChange(line.id, value)}
                     >
                       <SelectTrigger className="w-40 h-8 text-xs">
-                        <SelectValue placeholder="Stimme wählen" />
+                        <SelectValue placeholder={t("editor.voice.select")} />
                       </SelectTrigger>
                       <SelectContent>
                         {voices.map(voice => (
@@ -207,7 +209,7 @@ export const DialogueEditor = ({
                 {/* AI Edit controls */}
                 <div className="flex items-center gap-2">
                   <Input
-                    placeholder="Beschreibe die gewünschte Änderung..."
+                    placeholder={t("editor.edit.placeholder")}
                     value={editInstructions[line.id] || ""}
                     onChange={(e) => setEditInstructions(prev => ({
                       ...prev,
@@ -228,7 +230,7 @@ export const DialogueEditor = ({
                     ) : (
                       <Wand2 className="w-3 h-3" />
                     )}
-                    Ändern
+                    {t("editor.edit.button")}
                   </Button>
                   <Button
                     variant="outline"
@@ -238,7 +240,7 @@ export const DialogueEditor = ({
                     className="gap-1"
                   >
                     <Minus className="w-3 h-3" />
-                    Kürzer
+                    {t("editor.shorten")}
                   </Button>
                   <Button
                     variant="outline"
@@ -248,7 +250,7 @@ export const DialogueEditor = ({
                     className="gap-1"
                   >
                     <Plus className="w-3 h-3" />
-                    Länger
+                    {t("editor.lengthen")}
                   </Button>
                 </div>
               </div>
@@ -258,7 +260,7 @@ export const DialogueEditor = ({
 
         {dialogue.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
-            <p>Keine Dialogzeilen vorhanden.</p>
+            <p>{t("editor.empty")}</p>
           </div>
         )}
 

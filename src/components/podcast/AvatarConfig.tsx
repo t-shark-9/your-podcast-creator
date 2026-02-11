@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Image, Plus, Trash2, Upload, User, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Avatar } from "@/types/podcast";
 
@@ -40,6 +41,7 @@ export const AvatarConfig = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const getApiKey = () => {
     return localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY;
@@ -76,8 +78,8 @@ export const AvatarConfig = ({
     if (file) {
       if (!file.type.startsWith('image/')) {
         toast({
-          title: "Ungültiges Format",
-          description: "Bitte wähle eine Bilddatei aus.",
+          title: t("avatar.error.format"),
+          description: t("avatar.error.format.desc"),
           variant: "destructive"
         });
         return;
@@ -86,8 +88,8 @@ export const AvatarConfig = ({
       // Check file size (max 10MB for JoggAI)
       if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: "Datei zu groß",
-          description: "Die maximale Dateigröße beträgt 10MB.",
+          title: t("avatar.error.size"),
+          description: t("avatar.error.size.desc"),
           variant: "destructive"
         });
         return;
@@ -137,8 +139,8 @@ export const AvatarConfig = ({
   const handleSaveAvatar = async () => {
     if (!selectedImage || !avatarName.trim()) {
       toast({
-        title: "Fehler",
-        description: "Bitte wähle ein Bild aus und gib einen Namen ein.",
+        title: t("avatar.error.form"),
+        description: t("avatar.error.form.desc"),
         variant: "destructive"
       });
       return;
@@ -159,16 +161,16 @@ export const AvatarConfig = ({
     try {
       // Upload the image first
       toast({
-        title: "Bild wird hochgeladen...",
-        description: "Bitte warten..."
+        title: t("avatar.uploading"),
+        description: t("avatar.uploading.wait")
       });
 
       const imageUrl = await uploadImageToJoggAi(selectedImage);
 
       // Create photo avatar in JoggAI
       toast({
-        title: "Avatar wird erstellt...",
-        description: "Dies kann einige Minuten dauern."
+        title: t("avatar.creating"),
+        description: t("avatar.creating.wait")
       });
 
       const { data, error: invokeErr } = await supabase.functions.invoke("joggai-proxy", {
@@ -209,15 +211,15 @@ export const AvatarConfig = ({
       setTimeout(() => loadJoggAiAvatars(), 2000);
 
       toast({
-        title: "Avatar wird erstellt!",
-        description: `"${newAvatar.name}" wird bei JoggAI verarbeitet. Dies dauert etwa 2-5 Minuten.`
+        title: t("avatar.created"),
+        description: `"${newAvatar.name}" ${t("avatar.created.desc")}`
       });
 
     } catch (error) {
       console.error("Error creating avatar:", error);
       toast({
-        title: "Fehler beim Erstellen",
-        description: error instanceof Error ? error.message : "Der Avatar konnte nicht erstellt werden.",
+        title: t("avatar.error"),
+        description: error instanceof Error ? error.message : t("avatar.error.desc"),
         variant: "destructive"
       });
     } finally {
@@ -228,8 +230,8 @@ export const AvatarConfig = ({
   const selectJoggAiAvatar = (avatar: JoggAiPhotoAvatar, speaker: 1 | 2) => {
     if (avatar.status !== 1) {
       toast({
-        title: "Avatar wird noch verarbeitet",
-        description: "Bitte warte, bis der Avatar fertig ist.",
+        title: t("avatar.processing.wait"),
+        description: t("avatar.processing.wait.desc"),
         variant: "destructive"
       });
       return;
@@ -240,8 +242,8 @@ export const AvatarConfig = ({
     localStorage.setItem(`${prefix}_avatar_type`, "1"); // Photo avatar type
     
     toast({
-      title: `Avatar für Sprecher ${speaker} ausgewählt`,
-      description: `"${avatar.name}" wird für Sprecher ${speaker} verwendet.`
+      title: `${t("avatar.selected")} ${speaker}`,
+      description: `"${avatar.name}" ${t("avatar.selected.desc")} ${speaker}`
     });
   };
 
@@ -260,10 +262,10 @@ export const AvatarConfig = ({
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
               <User className="w-5 h-5" />
-              Meine Photo Avatare
+              {t("avatar.title")}
             </CardTitle>
             <CardDescription>
-              Erstelle personalisierte AI-Avatare aus deinen Fotos mit JoggAI.
+              {t("avatar.desc")}
             </CardDescription>
           </div>
           <Button
@@ -280,7 +282,7 @@ export const AvatarConfig = ({
         {/* JoggAI Photo Avatars */}
         {joggAiAvatars.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Deine JoggAI Avatare</h4>
+            <h4 className="text-sm font-medium text-muted-foreground">{t("avatar.joggai.list")}</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {joggAiAvatars.map(avatar => {
                 const isSpeaker1 = localStorage.getItem("joggai_speaker1_avatar") === avatar.id.toString() 
@@ -315,9 +317,9 @@ export const AvatarConfig = ({
                           className="text-xs"
                         >
                           {avatar.status === 1 ? (
-                            <><CheckCircle2 className="w-3 h-3 mr-1" /> Fertig</>
+                            <><CheckCircle2 className="w-3 h-3 mr-1" /> {t("avatar.status.ready")}</>
                           ) : (
-                            <><Clock className="w-3 h-3 mr-1" /> Verarbeitung</>
+                            <><Clock className="w-3 h-3 mr-1" /> {t("avatar.status.processing")}</>
                           )}
                         </Badge>
                         {isSpeaker1 && <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-200">S1</Badge>}
@@ -331,7 +333,7 @@ export const AvatarConfig = ({
                             className="h-6 text-xs flex-1"
                             onClick={() => selectJoggAiAvatar(avatar, 1)}
                           >
-                            Sprecher 1
+                            {t("avatar.speaker1")}
                           </Button>
                           <Button
                             size="sm"
@@ -339,7 +341,7 @@ export const AvatarConfig = ({
                             className="h-6 text-xs flex-1"
                             onClick={() => selectJoggAiAvatar(avatar, 2)}
                           >
-                            Sprecher 2
+                            {t("avatar.speaker2")}
                           </Button>
                         </div>
                       )}
@@ -377,44 +379,44 @@ export const AvatarConfig = ({
                   <div className="flex-1">
                     <p className="font-medium">{selectedImage?.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Klicke, um ein anderes Bild auszuwählen
+                      {t("avatar.upload.change")}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="text-center">
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="font-medium">Foto hochladen</p>
+                  <p className="font-medium">{t("avatar.upload.photo")}</p>
                   <p className="text-sm text-muted-foreground">
-                    Verwende ein klares Portraitfoto mit gutem Licht
+                    {t("avatar.upload.hint")}
                   </p>
                 </div>
               )}
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name des Avatars</label>
+              <label className="text-sm font-medium">{t("avatar.name.label")}</label>
               <Input
                 value={avatarName}
                 onChange={(e) => setAvatarName(e.target.value)}
-                placeholder="z.B. Moderator Max, Expertin Anna"
+                placeholder={t("avatar.name.placeholder")}
               />
             </div>
 
             <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-              <p className="font-medium mb-1">Tipps für beste Ergebnisse:</p>
+              <p className="font-medium mb-1">{t("avatar.tips")}</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Verwende ein klares Frontalfoto des Gesichts</li>
-                <li>Gute Beleuchtung ohne harte Schatten</li>
-                <li>Mindestens 512x512 Pixel Auflösung</li>
-                <li>Die Verarbeitung dauert 2-5 Minuten</li>
+                <li>{t("avatar.tip1")}</li>
+                <li>{t("avatar.tip2")}</li>
+                <li>{t("avatar.tip3")}</li>
+                <li>{t("avatar.tip4")}</li>
               </ul>
             </div>
 
             {/* Save/Cancel buttons */}
             <div className="flex items-center gap-2 justify-end">
               <Button variant="ghost" onClick={resetForm}>
-                Abbrechen
+                {t("avatar.cancel")}
               </Button>
               <Button
                 onClick={handleSaveAvatar}
@@ -426,7 +428,7 @@ export const AvatarConfig = ({
                 ) : (
                   <Image className="w-4 h-4" />
                 )}
-                Avatar bei JoggAI erstellen
+                {t("avatar.create")}
               </Button>
             </div>
           </div>
@@ -437,7 +439,7 @@ export const AvatarConfig = ({
             className="w-full gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neuen Photo Avatar erstellen
+            {t("avatar.add")}
           </Button>
         )}
       </CardContent>

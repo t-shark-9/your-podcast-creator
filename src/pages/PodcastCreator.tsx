@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Film } from "lucide-react";
+import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Film, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
@@ -17,11 +17,18 @@ import AvatarVoiceSelector from "@/components/podcast/AvatarVoiceSelector";
 import type { DialogueLine, Voice, Avatar, PodcastScript } from "@/types/podcast";
 import type { PodcastSpeakerConfig } from "@/lib/joggai";
 
-const EXAMPLE_TOPICS = [
+const EXAMPLE_TOPICS_DE = [
   "Die Zukunft der künstlichen Intelligenz und wie sie unseren Alltag verändert",
   "Nachhaltige Ernährung: Tipps und Tricks für einen umweltbewussten Lebensstil",
   "Die spannendsten Tech-Trends 2024 und was sie für uns bedeuten",
   "Work-Life-Balance: Wie man Beruf und Privatleben erfolgreich vereint"
+];
+
+const EXAMPLE_TOPICS_EN = [
+  "The future of artificial intelligence and how it changes our daily lives",
+  "Sustainable nutrition: tips and tricks for an eco-conscious lifestyle",
+  "The most exciting tech trends of 2024 and what they mean for us",
+  "Work-life balance: how to successfully combine work and personal life"
 ];
 
 type AppView = "input" | "customize" | "editor" | "settings";
@@ -41,7 +48,8 @@ export default function PodcastCreator() {
   const [processingLineId, setProcessingLineId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const EXAMPLE_TOPICS = language === "de" ? EXAMPLE_TOPICS_DE : EXAMPLE_TOPICS_EN;
 
   // Load saved voices and avatars from localStorage
   useEffect(() => {
@@ -214,7 +222,7 @@ export default function PodcastCreator() {
       const { data, error } = await supabase.functions.invoke('optimize-podcast-script', {
         body: {
           script: line.text,
-          instruction: "Mache diesen Text etwas länger und ausführlicher, aber behalte den Inhalt bei.",
+          instruction: language === "de" ? "Mache diesen Text etwas länger und ausführlicher, aber behalte den Inhalt bei." : "Make this text a bit longer and more detailed, but keep the content.",
           type: "lengthen"
         }
       });
@@ -228,8 +236,8 @@ export default function PodcastCreator() {
 
     } catch (error: any) {
       toast({
-        title: "Fehler",
-        description: "Der Text konnte nicht verlängert werden.",
+        title: t("podcast.ai.error"),
+        description: t("podcast.ai.error.lengthen"),
         variant: "destructive"
       });
     } finally {
@@ -249,7 +257,7 @@ export default function PodcastCreator() {
       const { data, error } = await supabase.functions.invoke('optimize-podcast-script', {
         body: {
           script: line.text,
-          instruction: "Kürze diesen Text und mache ihn prägnanter, ohne wichtige Informationen zu verlieren.",
+          instruction: language === "de" ? "Kürze diesen Text und mache ihn prägnanter, ohne wichtige Informationen zu verlieren." : "Shorten this text and make it more concise, without losing important information.",
           type: "shorten"
         }
       });
@@ -263,8 +271,8 @@ export default function PodcastCreator() {
 
     } catch (error: any) {
       toast({
-        title: "Fehler",
-        description: "Der Text konnte nicht gekürzt werden.",
+        title: t("podcast.ai.error"),
+        description: t("podcast.ai.error.shorten"),
         variant: "destructive"
       });
     } finally {
@@ -333,12 +341,12 @@ export default function PodcastCreator() {
           </div>
 
           <div className="text-center space-y-2 mb-6">
-            <h1 className="text-2xl font-bold">Sprecher konfigurieren</h1>
+            <h1 className="text-2xl font-bold">{t("podcast.configure.speakers")}</h1>
             <p className="text-muted-foreground">
-              Wähle Avatare und Stimmen für deine Sprecher
+              {t("podcast.configure.speakers.desc")}
             </p>
             <p className="text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-lg inline-block">
-              Thema: {topic}
+              {t("podcast.topic.label")} {topic}
             </p>
           </div>
 
@@ -411,11 +419,11 @@ export default function PodcastCreator() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="voices" className="gap-2">
                 <Mic className="w-4 h-4" />
-                Stimmen
+                {t("podcast.voices")}
               </TabsTrigger>
               <TabsTrigger value="avatars" className="gap-2">
                 <User className="w-4 h-4" />
-                Avatare
+                {t("podcast.avatars")}
               </TabsTrigger>
             </TabsList>
             <TabsContent value="voices" className="mt-4">
@@ -466,6 +474,12 @@ export default function PodcastCreator() {
           </Link>
           <div className="flex items-center gap-2">
             <LanguageToggle />
+            <Link to="/auth">
+              <Button variant="outline" size="sm" className="gap-2">
+                <LogIn className="w-4 h-4" />
+                {t("nav.login")}
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"
@@ -489,7 +503,7 @@ export default function PodcastCreator() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Textarea
-                placeholder="z.B. Ein Gespräch über die Zukunft der Elektromobilität, die Vor- und Nachteile, und was das für den Alltag bedeutet..."
+                placeholder={t("podcast.placeholder")}
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 className="min-h-[120px] resize-none"
@@ -551,13 +565,13 @@ export default function PodcastCreator() {
                   {voices.length > 0 && (
                     <span className="flex items-center gap-1">
                       <Mic className="w-4 h-4 text-muted-foreground" />
-                      {voices.length} Stimme{voices.length !== 1 ? 'n' : ''}
+                      {voices.length} {voices.length !== 1 ? t("podcast.voices.count") : t("podcast.voice.count")}
                     </span>
                   )}
                   {avatars.length > 0 && (
                     <span className="flex items-center gap-1">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      {avatars.length} Avatar{avatars.length !== 1 ? 'e' : ''}
+                      {avatars.length} {avatars.length !== 1 ? t("podcast.avatars.count") : t("podcast.avatar.count")}
                     </span>
                   )}
                 </div>
@@ -567,7 +581,7 @@ export default function PodcastCreator() {
                   onClick={() => setView("settings")}
                   className="text-xs"
                 >
-                  Verwalten
+                  {t("podcast.manage")}
                 </Button>
               </div>
             </CardContent>
