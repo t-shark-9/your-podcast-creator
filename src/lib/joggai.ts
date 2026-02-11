@@ -92,7 +92,13 @@ class JoggAiService {
 
   // Get user's photo avatars
   async getPhotoAvatars(): Promise<JoggAiAvatar[]> {
-    const data = await this.request<{ avatars: any[] }>("/avatars/photo_avatars", {
+    interface PhotoAvatarResponse {
+      id: number | string;
+      name: string;
+      cover_url?: string;
+      status: number;
+    }
+    const data = await this.request<{ avatars: PhotoAvatarResponse[] }>("/avatars/photo_avatars", {
       method: "GET",
     });
 

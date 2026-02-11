@@ -81,11 +81,11 @@ export default function AvatarVoiceSelector({
       setPublicAvatars(publicAvatarsData);
       setPhotoAvatars(photoAvatarsData);
       setVoices(voicesData);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error loading JoggAI resources:", error);
       toast({
         title: "Fehler beim Laden",
-        description: error.message || "Die Ressourcen konnten nicht geladen werden.",
+        description: error instanceof Error ? error.message : "Die Ressourcen konnten nicht geladen werden.",
         variant: "destructive",
       });
     } finally {

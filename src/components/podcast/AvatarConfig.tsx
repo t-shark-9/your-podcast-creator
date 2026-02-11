@@ -220,11 +220,11 @@ export const AvatarConfig = ({
         description: `"${newAvatar.name}" wird bei JoggAI verarbeitet. Dies dauert etwa 2-5 Minuten.`
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating avatar:", error);
       toast({
         title: "Fehler beim Erstellen",
-        description: error.message || "Der Avatar konnte nicht erstellt werden.",
+        description: error instanceof Error ? error.message : "Der Avatar konnte nicht erstellt werden.",
         variant: "destructive"
       });
     } finally {

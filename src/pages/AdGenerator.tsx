@@ -118,7 +118,7 @@ export default function AdGenerator() {
         description: "Der Prompt wurde für bessere Videoqualität optimiert."
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error enhancing prompt:', error);
       // Fallback: create a basic enhancement locally
       const enhanced = `Cinematic shot: ${prompt}. High quality, 4K resolution, professional lighting, smooth camera movement, vibrant colors, detailed textures.`;
@@ -209,11 +209,11 @@ export default function AdGenerator() {
       // Start polling for video status
       pollVideoStatus(videoId, apiKey);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating video:', error);
       toast({
         title: "Fehler bei der Video-Generierung",
-        description: error.message || "Das Video konnte nicht erstellt werden.",
+        description: error instanceof Error ? error.message : "Das Video konnte nicht erstellt werden.",
         variant: "destructive"
       });
       setStatus("failed");
@@ -288,7 +288,7 @@ export default function AdGenerator() {
         description: "Untertitel und Musik wurden hinzugefügt."
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding captions:', error);
       // Fallback: use raw video
       setCaptionedVideoUrl(rawVideoUrl);
@@ -335,7 +335,7 @@ export default function AdGenerator() {
         description: "Das Video wurde in deinem Google Drive gespeichert."
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving to drive:', error);
       toast({
         title: "Fehler beim Speichern",

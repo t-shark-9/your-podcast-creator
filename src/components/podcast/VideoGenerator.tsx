@@ -159,11 +159,11 @@ export default function VideoGenerator({
       // Start polling for status
       startPolling(videoId, apiKey);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Video generation error:", error);
       toast({
         title: "Fehler bei der Video-Generierung",
-        description: error.message || "Das Video konnte nicht erstellt werden.",
+        description: error instanceof Error ? error.message : "Das Video konnte nicht erstellt werden.",
         variant: "destructive",
       });
       setVideoJob(null);
