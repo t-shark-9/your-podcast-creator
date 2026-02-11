@@ -108,7 +108,8 @@ export default function VideoGenerator({
         avatarType = speaker1Config.avatarType;
       } else {
         avatarIdRaw = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
-        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "en-US-ChristopherNeural";
+        // Use a valid JoggAI voice ID as fallback (Sitcom Guy voice)
+        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "c5be03fa-09cc-4fc3-8852-7f5a32b5606c";
         avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
       }
 
@@ -160,6 +161,10 @@ export default function VideoGenerator({
       console.log("JoggAI response:", data);
 
       if (data.code !== 0) {
+        // Log detailed error info
+        if (data.details && Array.isArray(data.details)) {
+          console.error("JoggAI error details:", data.details);
+        }
         throw new Error(data.msg || "Video creation failed");
       }
 
