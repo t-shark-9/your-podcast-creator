@@ -62,11 +62,39 @@ export default function VideoGenerator({
     }
   }, [videoJob?.status]);
 
-  const getFullScript = () => {
+  // Build separate scripts for each speaker (no speaker labels)
+  const getSpeakerScripts = () => {
+    const speaker1Lines: string[] = [];
+    const speaker2Lines: string[] = [];
+    
+    for (const line of dialogue) {
+      if (line.speaker === "speaker1") {
+        speaker1Lines.push(line.text);
+      } else {
+        speaker2Lines.push(line.text);
+      }
+    }
+    
+    return {
+      speaker1Script: speaker1Lines.join(" "),
+      speaker2Script: speaker2Lines.join(" "),
+    };
+  };
+
+  // Build a combined dialogue script with speaker turns marked by [A] and [B]
+  const getDialogueScript = () => {
     return dialogue.map(line => {
-      const speakerName = line.speaker === "speaker1" ? speaker1Name : speaker2Name;
-      return `${speakerName}: ${line.text}`;
-    }).join("\n\n");
+      const marker = line.speaker === "speaker1" ? "[A]" : "[B]";
+      return `${marker} ${line.text}`;
+    }).join("\n");
+  };
+
+  // Helper to parse an avatar ID from config or localStorage
+  const parseAvatarId = (raw: string | number): number => {
+    if (typeof raw === "number") return raw;
+    const cleanId = String(raw).replace(/^photo_/, "");
+    const parsed = parseInt(cleanId, 10);
+    return isNaN(parsed) || parsed <= 0 ? 412 : parsed;
   };
 
   const generateVideo = async () => {
@@ -94,62 +122,80 @@ export default function VideoGenerator({
     setProgress(0);
 
     try {
-      // Get the full dialogue script with speaker names
-      const script = getFullScript();
-      
-      // Use speaker config if available, otherwise fall back to localStorage
-      let avatarIdRaw: string | number;
-      let voiceId: string;
-      let avatarType: number;
-      
+      // --- Speaker 1 config ---
+      let avatar1Id: number;
+      let avatar1Type: number;
+      let voice1Id: string;
+
       if (speaker1Config) {
-        avatarIdRaw = speaker1Config.avatarId;
-        voiceId = speaker1Config.voiceId;
-        avatarType = speaker1Config.avatarType;
+        avatar1Id = parseAvatarId(speaker1Config.avatarId);
+        avatar1Type = speaker1Config.avatarType;
+        voice1Id = speaker1Config.voiceId;
       } else {
-        avatarIdRaw = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
-        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "en-US-ChristopherNeural";
-        avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
+        avatar1Id = parseAvatarId(
+          localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412"
+        );
+        avatar1Type = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || "0");
+        voice1Id = localStorage.getItem("joggai_speaker1_voice") || "en-US-ChristopherNeural";
       }
 
-      // Parse avatar ID — API expects a number
-      let avatarId: number;
-      if (typeof avatarIdRaw === "number") {
-        avatarId = avatarIdRaw;
+      // --- Speaker 2 config ---
+      let avatar2Id: number;
+      let avatar2Type: number;
+      let voice2Id: string;
+
+      if (speaker2Config) {
+        avatar2Id = parseAvatarId(speaker2Config.avatarId);
+        avatar2Type = speaker2Config.avatarType;
+        voice2Id = speaker2Config.voiceId;
       } else {
-        // Remove any prefix like "photo_" and parse as number
-        const cleanId = String(avatarIdRaw).replace(/^photo_/, "");
-        avatarId = parseInt(cleanId, 10);
+        avatar2Id = parseAvatarId(
+          localStorage.getItem("joggai_speaker2_avatar") || "127"
+        );
+        avatar2Type = parseInt(localStorage.getItem("joggai_speaker2_avatar_type") || "0");
+        voice2Id = localStorage.getItem("joggai_speaker2_voice") || "en-US-JennyNeural";
       }
 
-      // Use known-good defaults if values are invalid
-      if (isNaN(avatarId) || avatarId <= 0) {
-        console.warn("Invalid avatar ID, using default (412):", avatarIdRaw);
-        avatarId = 412;
-        avatarType = 0;
-      }
+      // Fallback voice IDs
+      if (!voice1Id || voice1Id.trim() === "") voice1Id = "en-US-ChristopherNeural";
+      if (!voice2Id || voice2Id.trim() === "") voice2Id = "en-US-JennyNeural";
 
-      if (!voiceId || voiceId.trim() === "") {
-        console.warn("No voice ID selected, using default");
-        voiceId = "en-US-ChristopherNeural";
-      }
+      // Build the dialogue script with [A]/[B] turn markers
+      const dialogueScript = getDialogueScript();
+      // Also get separate per-speaker scripts as fallback
+      const { speaker1Script, speaker2Script } = getSpeakerScripts();
 
+      // Use the proper two-speaker podcast format:
+      // - avatar + avatar_b for two speakers
+      // - voice + voice_b for two voices
+      // - screen_style 2 = split screen (podcast layout)
+      // - dialogue script uses [A] and [B] markers for turn-taking
       const requestBody = {
         avatar: {
-          avatar_id: avatarId,
-          avatar_type: avatarType,
+          avatar_id: avatar1Id,
+          avatar_type: avatar1Type,
+        },
+        avatar_b: {
+          avatar_id: avatar2Id,
+          avatar_type: avatar2Type,
         },
         voice: {
-          type: "script",
-          voice_id: voiceId,
-          script: script,
+          type: "script" as const,
+          voice_id: voice1Id,
+          script: speaker1Script,
         },
+        voice_b: {
+          type: "script" as const,
+          voice_id: voice2Id,
+          script: speaker2Script,
+        },
+        dialogue: true,
         aspect_ratio: "landscape",
-        screen_style: 1,
+        screen_style: 2, // Split screen — podcast format
         caption: true,
       };
 
-      console.log("JoggAI request body:", JSON.stringify(requestBody, null, 2));
+      console.log("JoggAI podcast request body:", JSON.stringify(requestBody, null, 2));
 
       const response = await fetch("https://api.jogg.ai/v2/create_video_from_avatar", {
         method: "POST",
@@ -296,7 +342,7 @@ export default function VideoGenerator({
               Video generieren
             </CardTitle>
             <CardDescription>
-              Erstelle ein Avatar-Video aus deinem Podcast-Dialog mit JoggAI
+              Erstelle ein Podcast-Video mit zwei KI-Avataren im Splitscreen
             </CardDescription>
           </div>
           {getStatusBadge()}
@@ -308,7 +354,7 @@ export default function VideoGenerator({
             <div className="p-4 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">
                 <strong>{dialogue.length}</strong> Dialogzeilen bereit für die Video-Generierung.
-                Das Video wird mit einem KI-Avatar erstellt, der den Text vorliest.
+                Das Video wird mit zwei KI-Avataren im Splitscreen erstellt, die abwechselnd sprechen.
               </p>
             </div>
             
