@@ -84,17 +84,36 @@ class JoggAiService {
 
   // Get public avatars
   async getPublicAvatars(): Promise<JoggAiAvatar[]> {
-    const data = await this.request<JoggAiAvatar[] | { avatars: JoggAiAvatar[] }>("/avatars/public", {
+    interface PublicAvatarResponse {
+      id: number | string;
+      name: string;
+      cover_url?: string;
+      video_url?: string;
+      gender?: string;
+      style?: string;
+      age?: string;
+      aspect_ratio?: number;
+    }
+    const data = await this.request<PublicAvatarResponse[] | { avatars: PublicAvatarResponse[] }>("/avatars/public", {
       method: "GET",
     });
     // Handle both array response and object with avatars property
+    let rawAvatars: PublicAvatarResponse[];
     if (Array.isArray(data)) {
-      return data;
+      rawAvatars = data;
+    } else if (data && typeof data === 'object' && 'avatars' in data && Array.isArray(data.avatars)) {
+      rawAvatars = data.avatars;
+    } else {
+      return [];
     }
-    if (data && typeof data === 'object' && 'avatars' in data && Array.isArray(data.avatars)) {
-      return data.avatars;
-    }
-    return [];
+    // Map API 'id' field to our standardized 'avatar_id' field
+    return rawAvatars.map((a) => ({
+      avatar_id: a.id,
+      name: a.name,
+      preview_url: a.cover_url,
+      cover_url: a.cover_url,
+      gender: a.gender,
+    }));
   }
 
   // Get user's photo avatars

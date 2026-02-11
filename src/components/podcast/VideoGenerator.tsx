@@ -108,27 +108,30 @@ export default function VideoGenerator({
         avatarType = speaker1Config.avatarType;
       } else {
         avatarIdRaw = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
-        // Use a valid JoggAI voice ID as fallback (Sitcom Guy voice)
-        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "c5be03fa-09cc-4fc3-8852-7f5a32b5606c";
+        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "en-US-ChristopherNeural";
         avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
       }
 
-      // Parse avatar ID - handle both numeric IDs and string IDs with prefixes
+      // Parse avatar ID — API expects a number
       let avatarId: number;
       if (typeof avatarIdRaw === "number") {
         avatarId = avatarIdRaw;
       } else {
         // Remove any prefix like "photo_" and parse as number
-        const cleanId = avatarIdRaw.replace(/^photo_/, "");
+        const cleanId = String(avatarIdRaw).replace(/^photo_/, "");
         avatarId = parseInt(cleanId, 10);
-        if (isNaN(avatarId)) {
-          throw new Error("Ungültige Avatar ID. Bitte wähle einen Avatar aus.");
-        }
       }
 
-      // Validate voice ID
+      // Use known-good defaults if values are invalid
+      if (isNaN(avatarId) || avatarId <= 0) {
+        console.warn("Invalid avatar ID, using default (412):", avatarIdRaw);
+        avatarId = 412;
+        avatarType = 0;
+      }
+
       if (!voiceId || voiceId.trim() === "") {
-        throw new Error("Keine Stimme ausgewählt. Bitte wähle eine Stimme aus.");
+        console.warn("No voice ID selected, using default");
+        voiceId = "en-US-ChristopherNeural";
       }
 
       const requestBody = {
