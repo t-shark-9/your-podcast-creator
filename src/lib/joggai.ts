@@ -84,10 +84,17 @@ class JoggAiService {
 
   // Get public avatars
   async getPublicAvatars(): Promise<JoggAiAvatar[]> {
-    const data = await this.request<JoggAiAvatar[]>("/avatars/public", {
+    const data = await this.request<JoggAiAvatar[] | { avatars: JoggAiAvatar[] }>("/avatars/public", {
       method: "GET",
     });
-    return data || [];
+    // Handle both array response and object with avatars property
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === 'object' && 'avatars' in data && Array.isArray(data.avatars)) {
+      return data.avatars;
+    }
+    return [];
   }
 
   // Get user's photo avatars
@@ -118,10 +125,17 @@ class JoggAiService {
 
   // Get all voices
   async getVoices(): Promise<JoggAiVoice[]> {
-    const data = await this.request<JoggAiVoice[]>("/voices", {
+    const data = await this.request<JoggAiVoice[] | { voices: JoggAiVoice[] }>("/voices", {
       method: "GET",
     });
-    return data || [];
+    // Handle both array response and object with voices property
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === 'object' && 'voices' in data && Array.isArray(data.voices)) {
+      return data.voices;
+    }
+    return [];
   }
 
   // Create a photo avatar

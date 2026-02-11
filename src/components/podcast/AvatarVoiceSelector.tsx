@@ -78,9 +78,10 @@ export default function AvatarVoiceSelector({
         joggAiService.getVoices(),
       ]);
 
-      setPublicAvatars(publicAvatarsData);
-      setPhotoAvatars(photoAvatarsData);
-      setVoices(voicesData);
+      // Ensure arrays are set even if API returns unexpected format
+      setPublicAvatars(Array.isArray(publicAvatarsData) ? publicAvatarsData : []);
+      setPhotoAvatars(Array.isArray(photoAvatarsData) ? photoAvatarsData : []);
+      setVoices(Array.isArray(voicesData) ? voicesData : []);
     } catch (error) {
       console.error("Error loading JoggAI resources:", error);
       toast({
