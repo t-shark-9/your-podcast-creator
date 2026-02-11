@@ -116,19 +116,7 @@ const Index = () => {
           setIsGeneratingVideo(false);
           setCompletedSteps(prev => [...prev.filter(s => s !== "video"), "video"]);
           
-          // Trigger n8n webhook
-          triggerN8nWebhook(n8nConfig, "video_generated", {
-            videoUrl: outputUrl,
-            visualType: visualOutputType
-          });
           
-          // Also trigger workflow complete if we have everything
-          triggerN8nWebhook(n8nConfig, "workflow_complete", {
-            script: finalScript,
-            audioUrl: audioUrl,
-            videoUrl: outputUrl,
-            topics: config.topics
-          });
           
           toast({
             title: "Video fertig!",
@@ -144,7 +132,7 @@ const Index = () => {
 
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [videoPredictionId, videoUrl, toast, appMode, n8nConfig, visualOutputType, finalScript, audioUrl, config.topics]);
+  }, [videoPredictionId, videoUrl, toast, appMode, visualOutputType, finalScript, audioUrl, config.topics]);
 
   // Mode selection handlers
   const handleSelectMode = (mode: "simple" | "rigorous") => {
@@ -199,12 +187,6 @@ const Index = () => {
       setCompletedSteps(prev => [...prev.filter(s => s !== "config"), "config"]);
       setCurrentStep("variants");
       
-      // Trigger n8n webhook
-      triggerN8nWebhook(n8nConfig, "script_generated", {
-        variants: data.variants,
-        topics: config.topics,
-        duration: duration
-      });
       
       toast({
         title: "Varianten erstellt",
@@ -288,12 +270,7 @@ const Index = () => {
       setAudioUrl(url);
       setCompletedSteps(prev => [...prev.filter(s => s !== "audio"), "audio"]);
       
-      // Trigger n8n webhook
-      triggerN8nWebhook(n8nConfig, "audio_generated", {
-        script: finalScript,
-        voiceId: voiceId,
-        audioUrl: url
-      });
+      
       
       toast({
         title: "Audio fertig!",
