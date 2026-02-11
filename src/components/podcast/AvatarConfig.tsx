@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Image, Plus, Trash2, Upload, User, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import type { Avatar } from "@/types/podcast";
 
 interface JoggAiPhotoAvatar {
@@ -55,10 +56,10 @@ export const AvatarConfig = ({
 
     setIsLoadingAvatars(true);
     try {
-      const response = await fetch("https://api.jogg.ai/v2/avatars/photo_avatars", {
-        headers: { "x-api-key": apiKey }
+      const { data, error } = await supabase.functions.invoke("joggai-proxy", {
+        body: { endpoint: "/avatars/photo_avatars", method: "GET", apiKey }
       });
-      const data = await response.json();
+      if (error) throw error;
       
       if (data.code === 0 && data.data?.avatars) {
         setJoggAiAvatars(data.data.avatars);
@@ -105,20 +106,16 @@ export const AvatarConfig = ({
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("JoggAI API Key fehlt");
 
-    // First, get upload URL
-    const uploadResponse = await fetch("https://api.jogg.ai/v2/assets/upload_url", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        file_name: file.name,
-        content_type: file.type
-      })
+    // First, get upload URL via proxy
+    const { data: uploadData, error: uploadError } = await supabase.functions.invoke("joggai-proxy", {
+      body: {
+        endpoint: "/assets/upload_url",
+        method: "POST",
+        payload: { file_name: file.name, content_type: file.type },
+        apiKey
+      }
     });
-
-    const uploadData = await uploadResponse.json();
+    if (uploadError) throw uploadError;
     if (uploadData.code !== 0) {
       throw new Error(uploadData.msg || "Upload URL konnte nicht erstellt werden");
     }
@@ -174,19 +171,15 @@ export const AvatarConfig = ({
         description: "Dies kann einige Minuten dauern."
       });
 
-      const response = await fetch("https://api.jogg.ai/v2/avatars/create_photo_avatar", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          name: avatarName.trim(),
-          image_url: imageUrl
-        })
+      const { data, error: invokeErr } = await supabase.functions.invoke("joggai-proxy", {
+        body: {
+          endpoint: "/avatars/create_photo_avatar",
+          method: "POST",
+          payload: { name: avatarName.trim(), image_url: imageUrl },
+          apiKey
+        }
       });
-
-      const data = await response.json();
+      if (invokeErr) throw invokeErr;
 
       if (data.code !== 0) {
         throw new Error(data.msg || "Avatar konnte nicht erstellt werden");

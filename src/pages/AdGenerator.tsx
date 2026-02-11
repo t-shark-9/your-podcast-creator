@@ -184,16 +184,15 @@ export default function AdGenerator() {
 
       console.log("JoggAI request body:", JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch("https://api.jogg.ai/v2/create_video_from_avatar", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
+      const { data, error: invokeErr } = await supabase.functions.invoke("joggai-proxy", {
+        body: {
+          endpoint: "/create_video_from_avatar",
+          method: "POST",
+          payload: requestBody,
+          apiKey,
         },
-        body: JSON.stringify(requestBody),
       });
-
-      const data = await response.json();
+      if (invokeErr) throw invokeErr;
       console.log("JoggAI response:", data);
 
       if (data.code !== 0) {
@@ -226,10 +225,10 @@ export default function AdGenerator() {
   const pollVideoStatus = async (videoId: string, apiKey: string) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://api.jogg.ai/v2/avatar_video/${videoId}`, {
-          headers: { "x-api-key": apiKey }
+        const { data, error: invokeErr } = await supabase.functions.invoke("joggai-proxy", {
+          body: { endpoint: `/avatar_video/${videoId}`, method: "GET", apiKey }
         });
-        const data = await response.json();
+        if (invokeErr) { console.error("Polling proxy error:", invokeErr); return; }
         console.log("JoggAI status check:", data);
 
         if (data.data?.status === "completed" && data.data?.video_url) {

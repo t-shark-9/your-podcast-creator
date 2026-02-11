@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Settings = () => {
   const [apiKey, setApiKey] = useState("");
@@ -33,12 +34,10 @@ const Settings = () => {
     setIsValidating(true);
     
     try {
-      const response = await fetch("https://api.jogg.ai/v2/user/whoami", {
-        method: "GET",
-        headers: { "x-api-key": key },
+      const { data, error: invokeErr } = await supabase.functions.invoke("joggai-proxy", {
+        body: { endpoint: "/user/whoami", method: "GET", apiKey: key }
       });
-
-      const data = await response.json();
+      if (invokeErr) throw invokeErr;
       
       if (data.code === 0) {
         setIsValid(true);
