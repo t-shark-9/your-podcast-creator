@@ -98,23 +98,41 @@ export default function VideoGenerator({
       const script = getFullScript();
       
       // Use speaker config if available, otherwise fall back to localStorage
-      let avatarId: string | number;
+      let avatarIdRaw: string | number;
       let voiceId: string;
       let avatarType: number;
       
       if (speaker1Config) {
-        avatarId = speaker1Config.avatarId;
+        avatarIdRaw = speaker1Config.avatarId;
         voiceId = speaker1Config.voiceId;
         avatarType = speaker1Config.avatarType;
       } else {
-        avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
-        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
+        avatarIdRaw = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
+        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "en-US-ChristopherNeural";
         avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
+      }
+
+      // Parse avatar ID - handle both numeric IDs and string IDs with prefixes
+      let avatarId: number;
+      if (typeof avatarIdRaw === "number") {
+        avatarId = avatarIdRaw;
+      } else {
+        // Remove any prefix like "photo_" and parse as number
+        const cleanId = avatarIdRaw.replace(/^photo_/, "");
+        avatarId = parseInt(cleanId, 10);
+        if (isNaN(avatarId)) {
+          throw new Error("Ungültige Avatar ID. Bitte wähle einen Avatar aus.");
+        }
+      }
+
+      // Validate voice ID
+      if (!voiceId || voiceId.trim() === "") {
+        throw new Error("Keine Stimme ausgewählt. Bitte wähle eine Stimme aus.");
       }
 
       const requestBody = {
         avatar: {
-          avatar_id: typeof avatarId === "string" ? parseInt(avatarId) : avatarId,
+          avatar_id: avatarId,
           avatar_type: avatarType,
         },
         voice: {
