@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.joggai-create-video]
 verify_jwt = false
+
+[functions.joggai-proxy]
+verify_jwt = false
