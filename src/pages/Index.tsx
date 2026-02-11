@@ -14,7 +14,6 @@ import { UserMenu } from "@/components/UserMenu";
 import { ModeSelection } from "@/components/ModeSelection";
 import { SimplePodcastWorkflow } from "@/components/SimplePodcastWorkflow";
 import { VisualOutputSelector, type VisualOutputType } from "@/components/VisualOutputSelector";
-import { useN8nConfig, triggerN8nWebhook } from "@/components/N8nSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Podcast, ArrowLeft, ArrowRight, Volume2, Sparkles, Video, Loader2, Save, FolderOpen, Zap, ImageIcon, Settings } from "lucide-react";
@@ -37,9 +36,6 @@ const Index = () => {
   const [appMode, setAppMode] = useState<AppMode>("selection");
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("config");
   const [completedSteps, setCompletedSteps] = useState<WorkflowStep[]>([]);
-  
-  // n8n integration
-  const { config: n8nConfig } = useN8nConfig();
   
   // User state
   const [user, setUser] = useState<User | null>(null);

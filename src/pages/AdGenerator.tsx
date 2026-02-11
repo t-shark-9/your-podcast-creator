@@ -168,21 +168,22 @@ export default function AdGenerator() {
 
       const requestBody = {
         avatar: {
-          avatar_id: avatarId,
+          avatar_id: parseInt(avatarId),
           avatar_type: avatarType,
         },
         voice: {
           type: "script",
           voice_id: voiceId,
-          input: finalPrompt,
+          script: finalPrompt,
         },
-        aspect_ratio: "16:9",
+        aspect_ratio: "landscape",
+        screen_style: 1,
         caption: true,
       };
 
       console.log("JoggAI request body:", JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch("https://api.jogg.ai/v2/avatar", {
+      const response = await fetch("https://api.jogg.ai/v2/create_video_from_avatar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -198,7 +199,7 @@ export default function AdGenerator() {
         throw new Error(data.msg || "Video creation failed");
       }
 
-      const projectId = data.data.project_id;
+      const videoId = data.data.video_id;
       
       toast({
         title: "Video wird generiert",
@@ -206,7 +207,7 @@ export default function AdGenerator() {
       });
 
       // Start polling for video status
-      pollVideoStatus(projectId, apiKey);
+      pollVideoStatus(videoId, apiKey);
 
     } catch (error: any) {
       console.error('Error generating video:', error);
@@ -221,16 +222,16 @@ export default function AdGenerator() {
     }
   };
 
-  const pollVideoStatus = async (projectId: string, apiKey: string) => {
+  const pollVideoStatus = async (videoId: string, apiKey: string) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://api.jogg.ai/v2/project/${projectId}`, {
+        const response = await fetch(`https://api.jogg.ai/v2/avatar_video/${videoId}`, {
           headers: { "x-api-key": apiKey }
         });
         const data = await response.json();
         console.log("JoggAI status check:", data);
 
-        if (data.data?.status === "success" && data.data?.video_url) {
+        if (data.data?.status === "completed" && data.data?.video_url) {
           clearInterval(interval);
           setRawVideoUrl(data.data.video_url);
           setStatus("adding_captions");

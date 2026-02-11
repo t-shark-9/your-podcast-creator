@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Webhook, Film } from "lucide-react";
+import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Film } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
@@ -12,10 +12,10 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import DialogueEditor from "@/components/podcast/DialogueEditor";
 import VoiceRecorder from "@/components/podcast/VoiceRecorder";
 import AvatarConfig from "@/components/podcast/AvatarConfig";
-import N8nConfig from "@/components/podcast/N8nConfig";
-import JoggAiConfig from "@/components/podcast/JoggAiConfig";
 import VideoGenerator from "@/components/podcast/VideoGenerator";
+import AvatarVoiceSelector from "@/components/podcast/AvatarVoiceSelector";
 import type { DialogueLine, Voice, Avatar, PodcastScript } from "@/types/podcast";
+import type { PodcastSpeakerConfig } from "@/lib/joggai";
 
 const EXAMPLE_TOPICS = [
   "Die Zukunft der künstlichen Intelligenz und wie sie unseren Alltag verändert",
@@ -24,7 +24,7 @@ const EXAMPLE_TOPICS = [
   "Work-Life-Balance: Wie man Beruf und Privatleben erfolgreich vereint"
 ];
 
-type AppView = "input" | "editor" | "settings";
+type AppView = "input" | "customize" | "editor" | "settings";
 
 export default function PodcastCreator() {
   const [view, setView] = useState<AppView>("input");
@@ -33,6 +33,8 @@ export default function PodcastCreator() {
   const [dialogue, setDialogue] = useState<DialogueLine[]>([]);
   const [speaker1Name, setSpeaker1Name] = useState("Alex");
   const [speaker2Name, setSpeaker2Name] = useState("Sam");
+  const [speaker1Config, setSpeaker1Config] = useState<PodcastSpeakerConfig | null>(null);
+  const [speaker2Config, setSpeaker2Config] = useState<PodcastSpeakerConfig | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -57,6 +59,26 @@ export default function PodcastCreator() {
   useEffect(() => {
     localStorage.setItem('podcast-avatars', JSON.stringify(avatars));
   }, [avatars]);
+
+  const startCustomization = () => {
+    if (!topic.trim()) {
+      toast({
+        title: t("podcast.topic.missing"),
+        description: t("podcast.topic.missing.desc"),
+        variant: "destructive"
+      });
+      return;
+    }
+    setView("customize");
+  };
+
+  const handleSpeakerConfigComplete = (s1: PodcastSpeakerConfig, s2: PodcastSpeakerConfig) => {
+    setSpeaker1Config(s1);
+    setSpeaker2Config(s2);
+    setSpeaker1Name(s1.speakerName);
+    setSpeaker2Name(s2.speakerName);
+    generatePodcast();
+  };
 
   const generatePodcast = async () => {
     if (!topic.trim()) {
@@ -271,40 +293,6 @@ export default function PodcastCreator() {
       title: t("podcast.export.success"),
       description: t("podcast.export.desc")
     });
-
-    // Trigger n8n webhook if configured
-    triggerN8nWebhook(content);
-  };
-
-  const triggerN8nWebhook = async (scriptContent: string) => {
-    const webhookUrl = localStorage.getItem('n8n_webhook_url');
-    if (!webhookUrl) return;
-
-    try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'script_exported',
-          script: scriptContent,
-          speakers: {
-            speaker1: speaker1Name,
-            speaker2: speaker2Name
-          },
-          voices: voices.filter(v => dialogue.some(d => d.voiceId === v.id)),
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (response.ok) {
-        toast({
-          title: t("podcast.n8n.success"),
-          description: t("podcast.n8n.desc")
-        });
-      }
-    } catch (error) {
-      console.error('n8n webhook error:', error);
-    }
   };
 
   const handleVoiceCreated = (voice: Voice) => {
@@ -331,6 +319,51 @@ export default function PodcastCreator() {
     }
   };
 
+  // Render customize view (avatar/voice selection)
+  if (view === "customize") {
+    return (
+      <div className="min-h-screen p-4 md:p-8">
+        <div className="max-w-2xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => setView("input")}>
+              {t("podcast.back")}
+            </Button>
+            <LanguageToggle />
+          </div>
+
+          <div className="text-center space-y-2 mb-6">
+            <h1 className="text-2xl font-bold">Sprecher konfigurieren</h1>
+            <p className="text-muted-foreground">
+              Wähle Avatare und Stimmen für deine Sprecher
+            </p>
+            <p className="text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-lg inline-block">
+              Thema: {topic}
+            </p>
+          </div>
+
+          {isGenerating ? (
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="py-12 text-center space-y-4">
+                <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
+                <p className="text-muted-foreground">{t("podcast.generating")}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <AvatarVoiceSelector
+              speaker1Name={speaker1Name}
+              speaker2Name={speaker2Name}
+              onSpeaker1NameChange={setSpeaker1Name}
+              onSpeaker2NameChange={setSpeaker2Name}
+              onConfigComplete={handleSpeakerConfigComplete}
+              onSkip={generatePodcast}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Render based on current view
   if (view === "editor") {
     return (
@@ -349,6 +382,8 @@ export default function PodcastCreator() {
         onAIShorten={handleAIShorten}
         isProcessing={isProcessing}
         processingLineId={processingLineId}
+        speaker1Config={speaker1Config}
+        speaker2Config={speaker2Config}
       />
     );
   }
@@ -373,7 +408,7 @@ export default function PodcastCreator() {
           </div>
 
           <Tabs defaultValue="voices" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="voices" className="gap-2">
                 <Mic className="w-4 h-4" />
                 Stimmen
@@ -381,14 +416,6 @@ export default function PodcastCreator() {
               <TabsTrigger value="avatars" className="gap-2">
                 <User className="w-4 h-4" />
                 Avatare
-              </TabsTrigger>
-              <TabsTrigger value="joggai" className="gap-2">
-                <Video className="w-4 h-4" />
-                JoggAI
-              </TabsTrigger>
-              <TabsTrigger value="n8n" className="gap-2">
-                <Webhook className="w-4 h-4" />
-                n8n
               </TabsTrigger>
             </TabsList>
             <TabsContent value="voices" className="mt-4">
@@ -406,12 +433,6 @@ export default function PodcastCreator() {
                 onAvatarDeleted={handleAvatarDeleted}
                 isUploading={isUploading}
               />
-            </TabsContent>
-            <TabsContent value="joggai" className="mt-4">
-              <JoggAiConfig />
-            </TabsContent>
-            <TabsContent value="n8n" className="mt-4">
-              <N8nConfig />
             </TabsContent>
           </Tabs>
         </div>
@@ -477,7 +498,7 @@ export default function PodcastCreator() {
             </div>
 
             <Button
-              onClick={generatePodcast}
+              onClick={startCustomization}
               disabled={isGenerating || !topic.trim()}
               className="w-full gap-2"
               size="lg"

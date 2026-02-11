@@ -8,6 +8,7 @@ import { Loader2, Trash2, Minus, Plus, Wand2, Download, ArrowLeft, User, Setting
 import { useToast } from "@/hooks/use-toast";
 import VideoGenerator from "@/components/podcast/VideoGenerator";
 import type { DialogueLine, Voice, Avatar } from "@/types/podcast";
+import type { PodcastSpeakerConfig } from "@/lib/joggai";
 
 interface DialogueEditorProps {
   dialogue: DialogueLine[];
@@ -24,6 +25,8 @@ interface DialogueEditorProps {
   onAIShorten: (lineId: string) => Promise<void>;
   isProcessing: boolean;
   processingLineId: string | null;
+  speaker1Config?: PodcastSpeakerConfig | null;
+  speaker2Config?: PodcastSpeakerConfig | null;
 }
 
 export const DialogueEditor = ({
@@ -40,7 +43,9 @@ export const DialogueEditor = ({
   onAILengthen,
   onAIShorten,
   isProcessing,
-  processingLineId
+  processingLineId,
+  speaker1Config,
+  speaker2Config
 }: DialogueEditorProps) => {
   const [editInstructions, setEditInstructions] = useState<Record<string, string>>({});
   const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
@@ -264,6 +269,8 @@ export const DialogueEditor = ({
               dialogue={dialogue}
               speaker1Name={speaker1Name}
               speaker2Name={speaker2Name}
+              speaker1Config={speaker1Config}
+              speaker2Config={speaker2Config}
             />
           </div>
         )}

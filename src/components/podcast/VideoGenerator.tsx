@@ -6,11 +6,14 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, Video, CheckCircle2, AlertCircle, Download, ExternalLink, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { DialogueLine } from "@/types/podcast";
+import type { PodcastSpeakerConfig } from "@/lib/joggai";
 
 interface VideoGeneratorProps {
   dialogue: DialogueLine[];
   speaker1Name: string;
   speaker2Name: string;
+  speaker1Config?: PodcastSpeakerConfig | null;
+  speaker2Config?: PodcastSpeakerConfig | null;
 }
 
 interface VideoJob {
@@ -24,7 +27,9 @@ interface VideoJob {
 export default function VideoGenerator({ 
   dialogue, 
   speaker1Name, 
-  speaker2Name 
+  speaker2Name,
+  speaker1Config,
+  speaker2Config
 }: VideoGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoJob, setVideoJob] = useState<VideoJob | null>(null);
@@ -92,28 +97,39 @@ export default function VideoGenerator({
       // Get the full dialogue script with speaker names
       const script = getFullScript();
       
-      // Use Speaker 1 settings for the avatar video
-      const avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
-      const voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
-      const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
+      // Use speaker config if available, otherwise fall back to localStorage
+      let avatarId: string | number;
+      let voiceId: string;
+      let avatarType: number;
+      
+      if (speaker1Config) {
+        avatarId = speaker1Config.avatarId;
+        voiceId = speaker1Config.voiceId;
+        avatarType = speaker1Config.avatarType;
+      } else {
+        avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
+        voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
+        avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
+      }
 
       const requestBody = {
         avatar: {
-          avatar_id: avatarId,
+          avatar_id: typeof avatarId === "string" ? parseInt(avatarId) : avatarId,
           avatar_type: avatarType,
         },
         voice: {
           type: "script",
           voice_id: voiceId,
-          input: script,
+          script: script,
         },
-        aspect_ratio: "16:9",
+        aspect_ratio: "landscape",
+        screen_style: 1,
         caption: true,
       };
 
       console.log("JoggAI request body:", JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch("https://api.jogg.ai/v2/avatar", {
+      const response = await fetch("https://api.jogg.ai/v2/create_video_from_avatar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -129,9 +145,9 @@ export default function VideoGenerator({
         throw new Error(data.msg || "Video creation failed");
       }
 
-      const projectId = data.data.project_id;
+      const videoId = data.data.video_id;
       setVideoJob({
-        videoId: projectId,
+        videoId: videoId,
         status: "processing",
       });
 
@@ -164,7 +180,7 @@ export default function VideoGenerator({
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://api.jogg.ai/v2/project/${videoId}`, {
+        const response = await fetch(`https://api.jogg.ai/v2/avatar_video/${videoId}`, {
           method: "GET",
           headers: {
             "x-api-key": apiKey,

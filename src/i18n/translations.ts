@@ -63,8 +63,6 @@ export const translations = {
   "podcast.ai.error.edit": { de: "Die Änderung konnte nicht angewendet werden.", en: "The change could not be applied." },
   "podcast.ai.error.lengthen": { de: "Der Text konnte nicht verlängert werden.", en: "The text could not be lengthened." },
   "podcast.ai.error.shorten": { de: "Der Text konnte nicht gekürzt werden.", en: "The text could not be shortened." },
-  "podcast.n8n.success": { de: "n8n Workflow gestartet", en: "n8n Workflow started" },
-  "podcast.n8n.desc": { de: "Das Skript wurde an den n8n Workflow gesendet.", en: "The script was sent to the n8n workflow." },
 
   // Ad Generator
   "ads.title": { de: "Ad Generator", en: "Ad Generator" },
