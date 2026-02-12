@@ -195,14 +195,20 @@ class JoggAiService {
       }
     );
 
-    // Step 2: Upload file to the signed URL (direct — this is cloud storage, not jogg.ai)
-    await fetch(uploadInfo.sign_url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": file.type,
-      },
-      body: file,
-    });
+    // Step 2: Upload file via edge function proxy to avoid CORS
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("sign_url", uploadInfo.sign_url);
+    formData.append("content_type", file.type);
+
+    const { data: uploadResult, error: uploadError } = await supabase.functions.invoke(
+      "joggai-upload-proxy",
+      { body: formData }
+    );
+
+    if (uploadError || !uploadResult?.success) {
+      throw new Error(uploadResult?.error || uploadError?.message || "File upload failed");
+    }
 
     return uploadInfo.asset_url;
   }
