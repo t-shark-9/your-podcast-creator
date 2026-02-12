@@ -77,8 +77,8 @@ class JoggAiService {
     }
 
     // The proxy returns the raw JoggAI response: { code, msg, data }
-    if (data.code !== 0) {
-      throw new Error(data.msg || "JoggAI API Fehler");
+    if (!data || data.code !== 0) {
+      throw new Error(data?.msg || "JoggAI API error");
     }
 
     return data.data as T;
@@ -190,8 +190,8 @@ class JoggAiService {
       {
         method: "POST",
         body: JSON.stringify({
-          filename: file.name,
-          content_type: file.type,
+          file_name: file.name,
+          file_type: file.type,
         }),
       }
     );
