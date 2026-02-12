@@ -89,20 +89,6 @@ export const AvatarConfig = ({
     }
   };
 
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 028e2f7 (fix: JoggAI avatar processing (upload/list endpoints) & refactor AvatarConfig)
-  const handleSaveAvatar = async () => {
-    if (!selectedImage || !avatarName.trim()) {
-      toast({ title: "Fehler", description: "Bitte wähle ein Bild aus und gib einen Namen ein.", variant: "destructive" });
-      return;
-    }
-
-    setIsCreatingAvatar(true);
-
-    try {
   const handleSaveAvatar = async () => {
     if (!selectedImage || !avatarName.trim()) {
       toast({
@@ -166,7 +152,30 @@ export const AvatarConfig = ({
         title: t("avatar.error"),
         description: error instanceof Error ? error.message : t("avatar.error.desc"),
         variant: "destructive"
-     
+      });
+    } finally {
+      setIsCreatingAvatar(false);
+    }
+  };
+
+  const selectJoggAiAvatar = (avatar: JoggAiPhotoAvatar, speaker: 1 | 2) => {
+    if (avatar.status !== 1) {
+      toast({
+        title: t("avatar.processing.wait"),
+        description: t("avatar.processing.wait.desc"),
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const prefix = `joggai_speaker${speaker}`;
+    localStorage.setItem(`${prefix}_avatar`, avatar.id.toString());
+    localStorage.setItem(`${prefix}_avatar_type`, "1"); // Photo avatar type
+    
+    toast({
+      title: `${t("avatar.selected")} ${speaker}`,
+      description: `"${avatar.name}" ${t("avatar.selected.desc")} ${speaker}`
+    });
   };
 
   const resetForm = () => {
