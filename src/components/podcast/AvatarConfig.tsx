@@ -40,6 +40,11 @@ export const AvatarConfig = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { t } = useLanguage();
+
+  const getApiKey = () => {
+    return localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY;
+  };
 
   useEffect(() => {
     loadJoggAiAvatars();
