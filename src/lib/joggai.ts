@@ -133,24 +133,25 @@ class JoggAiService {
   // Get user's photo avatars
   async getPhotoAvatars(): Promise<JoggAiAvatar[]> {
     interface PhotoAvatarResponse {
-      id: number | string;
+      avatar_id?: string;
+      id?: number | string;
       name: string;
       cover_url?: string;
+      thumbnail_url?: string;
       status: number;
     }
-    const data = await this.request<{ avatars: PhotoAvatarResponse[] }>("/avatars/photo_avatars", {
+    const data = await this.request<{ avatars: PhotoAvatarResponse[] }>("/photo_avatar", {
       method: "GET",
     });
 
     if (!data?.avatars) return [];
 
-    // Convert to standardized format and filter for completed only
     return data.avatars
       .filter((a) => a.status === 1)
       .map((a) => ({
-        avatar_id: a.id,
+        avatar_id: a.avatar_id || a.id || "",
         name: a.name,
-        preview_url: a.cover_url,
+        preview_url: a.cover_url || a.thumbnail_url,
         isPhotoAvatar: true,
         status: a.status,
       }));
@@ -184,12 +185,12 @@ class JoggAiService {
   async uploadAsset(file: File): Promise<string> {
     // Step 1: Get signed upload URL (via proxy)
     const uploadInfo = await this.request<{ sign_url: string; asset_url: string }>(
-      "/assets/upload_url",
+      "/upload/asset",
       {
         method: "POST",
         body: JSON.stringify({
-          file_name: file.name,
-          file_type: file.type,
+          filename: file.name,
+          content_type: file.type,
         }),
       }
     );

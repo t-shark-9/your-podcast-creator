@@ -44,7 +44,18 @@ serve(async (req) => {
     }
 
     const response = await fetch(`${JOGGAI_API_URL}${endpoint}`, fetchOptions);
-    const data = await response.json();
+    const responseText = await response.text();
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.error(`JoggAI returned non-JSON (status ${response.status}):`, responseText.substring(0, 500));
+      return new Response(
+        JSON.stringify({ code: -1, msg: `JoggAI API returned non-JSON response (HTTP ${response.status})`, data: null }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 502 }
+      );
+    }
 
     console.log(`JoggAI proxy response: code=${data.code}, msg=${data.msg}`);
 
