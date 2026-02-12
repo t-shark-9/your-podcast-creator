@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Image, Plus, Upload, User, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Avatar } from "@/types/podcast";
+import { useLanguage } from "@/i18n/LanguageContext";
 import joggAiService from "@/lib/joggai";
+import type { Avatar } from "@/types/podcast";
 
 interface JoggAiPhotoAvatar {
-  id: number;
+  id: number | string;
   name: string;
   status: number;
   cover_url?: string;
@@ -45,17 +46,24 @@ export const AvatarConfig = ({
   }, []);
 
   const loadJoggAiAvatars = async () => {
+    // Only verify we have an API key, the service handles the rest
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+
     setIsLoadingAvatars(true);
     try {
+      // Use the service which now has correct endpoints
       const avatars = await joggAiService.getPhotoAvatars();
-      // Map back to the local interface (getPhotoAvatars returns completed only)
-      const mapped: JoggAiPhotoAvatar[] = avatars.map(a => ({
-        id: typeof a.avatar_id === "string" ? parseInt(a.avatar_id, 10) : (a.avatar_id as number),
+      
+      // Map to internal format
+      const mappedAvatars: JoggAiPhotoAvatar[] = avatars.map(a => ({
+        id: a.avatar_id,
         name: a.name,
         status: a.status ?? 1,
-        cover_url: a.preview_url,
+        cover_url: a.preview_url || undefined
       }));
-      setJoggAiAvatars(mapped);
+      
+      setJoggAiAvatars(mappedAvatars);
     } catch (error) {
       console.error("Error loading photo avatars:", error);
     } finally {
@@ -81,6 +89,11 @@ export const AvatarConfig = ({
     }
   };
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 028e2f7 (fix: JoggAI avatar processing (upload/list endpoints) & refactor AvatarConfig)
   const handleSaveAvatar = async () => {
     if (!selectedImage || !avatarName.trim()) {
       toast({ title: "Fehler", description: "Bitte wähle ein Bild aus und gib einen Namen ein.", variant: "destructive" });
@@ -90,10 +103,33 @@ export const AvatarConfig = ({
     setIsCreatingAvatar(true);
 
     try {
-      toast({ title: "Bild wird hochgeladen...", description: "Bitte warten..." });
+  const handleSaveAvatar = async () => {
+    if (!selectedImage || !avatarName.trim()) {
+      toast({
+        title: t("avatar.error.form"),
+        description: t("avatar.error.form.desc"),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsCreatingAvatar(true);
+
+    try {
+      // Upload the image first
+      toast({
+        title: t("avatar.uploading"),
+        description: t("avatar.uploading.wait")
+      });
+
       const imageUrl = await joggAiService.uploadAsset(selectedImage);
 
-      toast({ title: "Avatar wird erstellt...", description: "Dies kann einige Minuten dauern." });
+      // Create photo avatar in JoggAI
+      toast({
+        title: t("avatar.creating"),
+        description: t("avatar.creating.wait")
+      });
+
       const result = await joggAiService.createPhotoAvatar({
         photo_url: imageUrl,
         name: avatarName.trim(),
@@ -106,35 +142,31 @@ export const AvatarConfig = ({
         photoUrl: imagePreview || undefined,
         createdAt: new Date().toISOString(),
         isUploaded: true,
-        joggAiAvatarId: result.avatar_id,
+        joggAiAvatarId: result.avatar_id
       };
 
       onAvatarCreated(newAvatar);
+      // Reset form
       setAvatarName("");
       setAvatarDescription("");
       setSelectedImage(null);
       setImagePreview(null);
       setShowNewAvatar(false);
+      
+      // Reload JoggAI avatars
       setTimeout(() => loadJoggAiAvatars(), 2000);
 
-      toast({ title: "Avatar wird erstellt!", description: `"${newAvatar.name}" wird bei JoggAI verarbeitet. Dies dauert etwa 2-5 Minuten.` });
+      toast({
+        title: t("avatar.created"),
+        description: `"${newAvatar.name}" ${t("avatar.created.desc")}`
+      });
     } catch (error) {
       console.error("Error creating avatar:", error);
-      toast({ title: "Fehler beim Erstellen", description: error instanceof Error ? error.message : "Der Avatar konnte nicht erstellt werden.", variant: "destructive" });
-    } finally {
-      setIsCreatingAvatar(false);
-    }
-  };
-
-  const selectJoggAiAvatar = (avatar: JoggAiPhotoAvatar, speaker: 1 | 2) => {
-    if (avatar.status !== 1) {
-      toast({ title: "Avatar wird noch verarbeitet", description: "Bitte warte, bis der Avatar fertig ist.", variant: "destructive" });
-      return;
-    }
-    const prefix = `joggai_speaker${speaker}`;
-    localStorage.setItem(`${prefix}_avatar`, avatar.id.toString());
-    localStorage.setItem(`${prefix}_avatar_type`, "1");
-    toast({ title: `Avatar für Sprecher ${speaker} ausgewählt`, description: `"${avatar.name}" wird für Sprecher ${speaker} verwendet.` });
+      toast({
+        title: t("avatar.error"),
+        description: error instanceof Error ? error.message : t("avatar.error.desc"),
+        variant: "destructive"
+     
   };
 
   const resetForm = () => {

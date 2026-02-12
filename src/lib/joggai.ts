@@ -133,25 +133,26 @@ class JoggAiService {
   // Get user's photo avatars
   async getPhotoAvatars(): Promise<JoggAiAvatar[]> {
     interface PhotoAvatarResponse {
-      avatar_id?: string;
-      id?: number | string;
+      avatar_id: string;
       name: string;
       cover_url?: string;
       thumbnail_url?: string;
       status: number;
     }
-    const data = await this.request<{ avatars: PhotoAvatarResponse[] }>("/photo_avatar", {
+    
+    // Use correct endpoint for JoggAI v2
+    const data = await this.request<{ avatars: PhotoAvatarResponse[] }>("/photo_avatar?page=1&limit=100", {
       method: "GET",
     });
 
     if (!data?.avatars) return [];
 
+    // Convert to standardized format
     return data.avatars
-      .filter((a) => a.status === 1)
       .map((a) => ({
-        avatar_id: a.avatar_id || a.id || "",
+        avatar_id: a.avatar_id,
         name: a.name,
-        preview_url: a.cover_url || a.thumbnail_url,
+        preview_url: a.thumbnail_url || a.cover_url,
         isPhotoAvatar: true,
         status: a.status,
       }));
