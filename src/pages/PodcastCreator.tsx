@@ -12,6 +12,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import DialogueEditor from "@/components/podcast/DialogueEditor";
 import VoiceRecorder from "@/components/podcast/VoiceRecorder";
 import AvatarConfig from "@/components/podcast/AvatarConfig";
+import ApiKeyConfig from "@/components/podcast/ApiKeyConfig";
 import VideoGenerator from "@/components/podcast/VideoGenerator";
 import AvatarVoiceSelector from "@/components/podcast/AvatarVoiceSelector";
 import type { DialogueLine, Voice, Avatar, PodcastScript } from "@/types/podcast";
@@ -416,7 +417,7 @@ export default function PodcastCreator() {
           </div>
 
           <Tabs defaultValue="voices" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="voices" className="gap-2">
                 <Mic className="w-4 h-4" />
                 {t("podcast.voices")}
@@ -424,6 +425,10 @@ export default function PodcastCreator() {
               <TabsTrigger value="avatars" className="gap-2">
                 <User className="w-4 h-4" />
                 {t("podcast.avatars")}
+              </TabsTrigger>
+              <TabsTrigger value="api" className="gap-2">
+                <Settings className="w-4 h-4" />
+                API
               </TabsTrigger>
             </TabsList>
             <TabsContent value="voices" className="mt-4">
@@ -441,6 +446,9 @@ export default function PodcastCreator() {
                 onAvatarDeleted={handleAvatarDeleted}
                 isUploading={isUploading}
               />
+            </TabsContent>
+            <TabsContent value="api" className="mt-4">
+              <ApiKeyConfig />
             </TabsContent>
           </Tabs>
         </div>

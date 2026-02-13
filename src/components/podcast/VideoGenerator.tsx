@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Video, CheckCircle2, AlertCircle, Download, ExternalLink, Play } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Video, CheckCircle2, AlertCircle, Download, ExternalLink, Play, RefreshCw, Settings2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -26,6 +29,24 @@ interface VideoJob {
   createdAt?: number;
 }
 
+const VIDEO_JOB_STORAGE_KEY = "podcast_video_job";
+
+function loadVideoJobFromStorage(): VideoJob | null {
+  try {
+    const stored = localStorage.getItem(VIDEO_JOB_STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+}
+
+function saveVideoJobToStorage(job: VideoJob | null) {
+  if (job) {
+    localStorage.setItem(VIDEO_JOB_STORAGE_KEY, JSON.stringify(job));
+  } else {
+    localStorage.removeItem(VIDEO_JOB_STORAGE_KEY);
+  }
+}
+
 export default function VideoGenerator({ 
   dialogue, 
   speaker1Name, 
@@ -34,29 +55,65 @@ export default function VideoGenerator({
   speaker2Config
 }: VideoGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [videoJob, setVideoJob] = useState<VideoJob | null>(null);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [videoJob, setVideoJob] = useState<VideoJob | null>(loadVideoJobFromStorage);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Video settings
+  const [aspectRatio, setAspectRatio] = useState<string>(
+    localStorage.getItem("video_aspect_ratio") || "landscape"
+  );
+  const [screenStyle, setScreenStyle] = useState<string>(
+    localStorage.getItem("video_screen_style") || "2"
+  );
+  const [captionsEnabled, setCaptionsEnabled] = useState<boolean>(
+    localStorage.getItem("video_captions") !== "false"
+  );
   
   const { toast } = useToast();
   const { t } = useLanguage();
 
+  // Persist videoJob changes to localStorage
+  useEffect(() => {
+    saveVideoJobToStorage(videoJob);
+  }, [videoJob]);
+
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem("video_aspect_ratio", aspectRatio);
+  }, [aspectRatio]);
+  useEffect(() => {
+    localStorage.setItem("video_screen_style", screenStyle);
+  }, [screenStyle]);
+  useEffect(() => {
+    localStorage.setItem("video_captions", String(captionsEnabled));
+  }, [captionsEnabled]);
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
     };
-  }, [pollingInterval]);
+  }, []);
+
+  // Resume polling for persisted in-progress jobs
+  useEffect(() => {
+    if (videoJob && (videoJob.status === "processing" || videoJob.status === "pending") && !pollingRef.current) {
+      startPolling(videoJob.videoId);
+    }
+  }, []);
 
   // Simulate progress while processing
   useEffect(() => {
-    if (videoJob?.status === "processing") {
+    if (videoJob?.status === "processing" || videoJob?.status === "pending") {
       const interval = setInterval(() => {
         setProgress(prev => {
           if (prev >= 95) return prev;
-          return prev + Math.random() * 5;
+          return prev + Math.random() * 3;
         });
       }, 3000);
       return () => clearInterval(interval);
@@ -171,8 +228,9 @@ export default function VideoGenerator({
       // Use the proper two-speaker podcast format:
       // - avatar + avatar_b for two speakers
       // - voice + voice_b for two voices
-      // - screen_style 2 = split screen (podcast layout)
+      // - screen_style: 1=full, 2=split, 3=pip
       // - dialogue script uses [A] and [B] markers for turn-taking
+      const usedScreenStyle = parseInt(screenStyle, 10) || 2;
       const requestBody = {
         avatar: {
           avatar_id: avatar1Id,
@@ -193,9 +251,9 @@ export default function VideoGenerator({
           script: speaker2Script,
         },
         dialogue: true,
-        aspect_ratio: "landscape",
-        screen_style: 2, // Split screen — podcast format
-        caption: true,
+        aspect_ratio: aspectRatio,
+        screen_style: usedScreenStyle,
+        caption: captionsEnabled,
       };
 
       console.log("JoggAI podcast request body:", JSON.stringify(requestBody, null, 2));
@@ -251,69 +309,97 @@ export default function VideoGenerator({
     }
   };
 
+  const checkVideoStatus = useCallback(async (videoId: string): Promise<VideoJob | null> => {
+    const pollApiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke("joggai-proxy", {
+        body: {
+          endpoint: `/avatar_video/${videoId}`,
+          method: "GET",
+          apiKey: pollApiKey || undefined,
+        },
+      });
+
+      if (invokeError) {
+        console.error("Polling proxy error:", invokeError);
+        return null;
+      }
+
+      console.log("JoggAI status check raw:", JSON.stringify(data));
+
+      if (!data || data.code !== 0) {
+        console.error("Status check failed:", data);
+        return null;
+      }
+
+      const statusRaw = data.data?.status;
+      const mappedStatus = 
+        statusRaw === "success" || statusRaw === "completed" || statusRaw === 1 ? "completed" :
+        statusRaw === "failed" || statusRaw === "error" || statusRaw === -1 ? "failed" :
+        "processing";
+
+      return {
+        videoId,
+        status: mappedStatus,
+        videoUrl: data.data?.video_url || data.data?.videoUrl,
+        coverUrl: data.data?.cover_url || data.data?.coverUrl,
+        createdAt: data.data?.created_at || data.data?.createdAt,
+      };
+    } catch (error) {
+      console.error("Polling error:", error);
+      return null;
+    }
+  }, []);
+
   const startPolling = (videoId: string) => {
     // Clear any existing interval
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
     }
 
-    const pollApiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
-
     const interval = setInterval(async () => {
-      try {
-        const { data, error: invokeError } = await supabase.functions.invoke("joggai-proxy", {
-          body: {
-            endpoint: `/avatar_video/${videoId}`,
-            method: "GET",
-            apiKey: pollApiKey || undefined,
-          },
+      const result = await checkVideoStatus(videoId);
+      if (!result) return; // Transient error, keep polling
+
+      setVideoJob(result);
+
+      if (result.status === "completed") {
+        clearInterval(interval);
+        pollingRef.current = null;
+        toast({
+          title: t("video.completed"),
+          description: t("video.completed.desc"),
         });
-
-        if (invokeError) {
-          console.error("Polling proxy error:", invokeError);
-          return;
-        }
-
-        console.log("JoggAI status check:", data);
-
-        if (data.code !== 0) {
-          console.error("Status check failed:", data);
-          return;
-        }
-
-        const status = data.data.status;
-        
-        setVideoJob({
-          videoId,
-          status: status === "success" || status === "completed" ? "completed" : 
-                  status === "failed" ? "failed" : "processing",
-          videoUrl: data.data.video_url,
-          coverUrl: data.data.cover_url,
-          createdAt: data.data.created_at,
+      } else if (result.status === "failed") {
+        clearInterval(interval);
+        pollingRef.current = null;
+        toast({
+          title: t("video.failed"),
+          description: t("video.failed.desc"),
+          variant: "destructive",
         });
-
-        if (status === "success" || status === "completed") {
-          clearInterval(interval);
-          setPollingInterval(null);
-          toast({
-            title: t("video.completed"),
-            description: t("video.completed.desc"),
-          });
-        } else if (status === "failed") {
-          clearInterval(interval);
-          setPollingInterval(null);
-          toast({
-            title: t("video.failed"),
-            description: t("video.failed.desc"),
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
       }
-    }, 10000); // Poll every 10 seconds
+    }, 8000); // Poll every 8 seconds
 
-    setPollingInterval(interval);
+    pollingRef.current = interval;
+  };
+
+  const handleManualRefresh = async () => {
+    if (!videoJob?.videoId) return;
+    const result = await checkVideoStatus(videoJob.videoId);
+    if (result) {
+      setVideoJob(result);
+      if (result.status === "completed") {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        toast({ title: t("video.completed"), description: t("video.completed.desc") });
+      }
+    } else {
+      toast({ title: t("video.error"), description: "Status check failed. Retrying...", variant: "destructive" });
+    }
   };
 
   const getStatusBadge = () => {
@@ -359,10 +445,69 @@ export default function VideoGenerator({
               {t("video.desc")}
             </CardDescription>
           </div>
-          {getStatusBadge()}
+          <div className="flex items-center gap-2">
+            {!videoJob && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettings(!showSettings)}
+                title={t("video.settings")}
+              >
+                <Settings2 className="w-4 h-4" />
+              </Button>
+            )}
+            {getStatusBadge()}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Video Settings Panel */}
+        {showSettings && !videoJob && (
+          <div className="p-4 border rounded-lg space-y-4 bg-muted/20">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Settings2 className="w-4 h-4" />
+              {t("video.settings")}
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs">{t("video.settings.aspect")}</Label>
+                <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="landscape">Landscape (16:9)</SelectItem>
+                    <SelectItem value="portrait">Portrait (9:16)</SelectItem>
+                    <SelectItem value="square">Square (1:1)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">{t("video.settings.screen")}</Label>
+                <Select value={screenStyle} onValueChange={setScreenStyle}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">{t("video.settings.screen.full")}</SelectItem>
+                    <SelectItem value="2">{t("video.settings.screen.split")}</SelectItem>
+                    <SelectItem value="3">{t("video.settings.screen.pip")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">{t("video.settings.captions")}</Label>
+                <div className="flex items-center gap-2 h-9">
+                  <Switch checked={captionsEnabled} onCheckedChange={setCaptionsEnabled} />
+                  <span className="text-sm text-muted-foreground">
+                    {captionsEnabled ? t("video.settings.captions.on") : t("video.settings.captions.off")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {!videoJob && (
           <>
             <div className="p-4 bg-muted/50 rounded-lg">
@@ -392,11 +537,17 @@ export default function VideoGenerator({
           </>
         )}
 
-        {videoJob?.status === "processing" && (
+        {(videoJob?.status === "processing" || videoJob?.status === "pending") && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {t("video.processing")}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {t("video.processing")}
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleManualRefresh} className="gap-1">
+                <RefreshCw className="w-3 h-3" />
+                {t("video.refresh")}
+              </Button>
             </div>
             <Progress value={progress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
@@ -405,48 +556,62 @@ export default function VideoGenerator({
           </div>
         )}
 
-        {videoJob?.status === "completed" && videoJob.videoUrl && (
+        {videoJob?.status === "completed" && (
           <div className="space-y-4">
-            {videoJob.coverUrl && (
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-black">
-                <img 
-                  src={videoJob.coverUrl} 
-                  alt="Video preview" 
-                  className="w-full h-full object-cover"
-                />
-                <a 
-                  href={videoJob.videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/50 transition-colors"
-                >
-                  <Play className="w-16 h-16 text-white" fill="white" />
-                </a>
+            {videoJob.videoUrl ? (
+              <>
+                {videoJob.coverUrl && (
+                  <div className="relative aspect-video rounded-lg overflow-hidden bg-black">
+                    <img 
+                      src={videoJob.coverUrl} 
+                      alt="Video preview" 
+                      className="w-full h-full object-cover"
+                    />
+                    <a 
+                      href={videoJob.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/50 transition-colors"
+                    >
+                      <Play className="w-16 h-16 text-white" fill="white" />
+                    </a>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 gap-2"
+                    onClick={() => window.open(videoJob.videoUrl, "_blank")}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    {t("video.watch")}
+                  </Button>
+                  <Button 
+                    className="flex-1 gap-2"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = videoJob.videoUrl!;
+                      a.download = `podcast-video-${new Date().toISOString().split('T')[0]}.mp4`;
+                      a.click();
+                    }}
+                  >
+                    <Download className="w-4 h-4" />
+                    {t("video.download")}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20 space-y-2">
+                <p className="text-sm text-green-600">
+                  {t("video.completed.nourl")}
+                </p>
+                <Button variant="outline" size="sm" onClick={handleManualRefresh} className="gap-1">
+                  <RefreshCw className="w-3 h-3" />
+                  {t("video.refresh")}
+                </Button>
               </div>
             )}
-
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                className="flex-1 gap-2"
-                onClick={() => window.open(videoJob.videoUrl, "_blank")}
-              >
-                <ExternalLink className="w-4 h-4" />
-                {t("video.watch")}
-              </Button>
-              <Button 
-                className="flex-1 gap-2"
-                onClick={() => {
-                  const a = document.createElement("a");
-                  a.href = videoJob.videoUrl!;
-                  a.download = `podcast-video-${new Date().toISOString().split('T')[0]}.mp4`;
-                  a.click();
-                }}
-              >
-                <Download className="w-4 h-4" />
-                {t("video.download")}
-              </Button>
-            </div>
 
             <Button
               variant="ghost"

@@ -190,8 +190,8 @@ class JoggAiService {
       {
         method: "POST",
         body: JSON.stringify({
-          file_name: file.name,
-          file_type: file.type,
+          filename: file.name,
+          content_type: file.type,
         }),
       }
     );
@@ -221,6 +221,8 @@ class JoggAiService {
     voiceId: string;
     script: string;
     aspectRatio?: "landscape" | "portrait" | "square";
+    screenStyle?: number;
+    caption?: boolean;
     backgroundColor?: string;
   }): Promise<{ video_id: string }> {
     const data = await this.request<{ video_id: string }>("/create_video_from_avatar", {
@@ -236,6 +238,8 @@ class JoggAiService {
           voice_id: config.voiceId,
         },
         aspect_ratio: config.aspectRatio || "landscape",
+        screen_style: config.screenStyle || 1,
+        caption: config.caption ?? true,
         video_background: {
           type: "color",
           value: config.backgroundColor || "#1a1a2e",

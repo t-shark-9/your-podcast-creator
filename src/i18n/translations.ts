@@ -162,6 +162,7 @@ export const translations = {
   "settings.joggai.invalid.desc": { de: "Der API Key konnte nicht validiert werden.", en: "The API key could not be validated." },
   "settings.joggai.error": { de: "Validierungsfehler", en: "Validation error" },
   "settings.joggai.error.desc": { de: "Verbindung zu JoggAI fehlgeschlagen.", en: "Connection to JoggAI failed." },
+  "settings.joggai.hint": { de: "Du findest deinen API Key im JoggAI Dashboard unter Settings → API.", en: "Find your API key in the JoggAI Dashboard under Settings → API." },
 
   // DialogueEditor
   "editor.title": { de: "Dialog bearbeiten", en: "Edit Dialogue" },
@@ -208,6 +209,17 @@ export const translations = {
   "video.new": { de: "Neues Video erstellen", en: "Create New Video" },
   "video.failed.message": { de: "Die Video-Generierung ist fehlgeschlagen. Bitte versuche es erneut.", en: "Video generation failed. Please try again." },
   "video.retry": { de: "Erneut versuchen", en: "Try Again" },
+  "video.refresh": { de: "Status prüfen", en: "Check Status" },
+  "video.settings": { de: "Video-Einstellungen", en: "Video Settings" },
+  "video.settings.aspect": { de: "Seitenverhältnis", en: "Aspect Ratio" },
+  "video.settings.screen": { de: "Bildmodus", en: "Screen Style" },
+  "video.settings.screen.full": { de: "Vollbild", en: "Full Screen" },
+  "video.settings.screen.split": { de: "Splitscreen (Podcast)", en: "Split Screen (Podcast)" },
+  "video.settings.screen.pip": { de: "Bild-in-Bild", en: "Picture in Picture" },
+  "video.settings.captions": { de: "Untertitel", en: "Captions" },
+  "video.settings.captions.on": { de: "Aktiviert", en: "Enabled" },
+  "video.settings.captions.off": { de: "Deaktiviert", en: "Disabled" },
+  "video.completed.nourl": { de: "Video wurde generiert, aber die URL ist noch nicht verfügbar. Bitte prüfe den Status erneut.", en: "Video was generated but the URL is not yet available. Please check the status again." },
 
   // AvatarVoiceSelector
   "avs.title": { de: "Sprecher konfigurieren", en: "Configure Speakers" },
