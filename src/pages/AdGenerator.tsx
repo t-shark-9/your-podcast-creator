@@ -243,18 +243,28 @@ export default function AdGenerator() {
           body: { endpoint: `/avatar_video/${videoId}`, method: "GET", apiKey }
         });
         if (invokeErr) { console.error("Polling proxy error:", invokeErr); return; }
-        console.log("JoggAI status check:", data);
+        console.log("JoggAI status check:", JSON.stringify(data));
 
-        if (data.data?.status === "completed" && data.data?.video_url) {
+        const statusRaw = data.data?.status;
+        const videoUrl = data.data?.video_url || data.data?.videoUrl;
+
+        // JoggAI returns "success" for completed videos, NOT "completed"
+        const isCompleted = statusRaw === "success" || statusRaw === "completed" || statusRaw === 1;
+        const isFailed = statusRaw === "failed" || statusRaw === "error" || statusRaw === -1;
+
+        if (isCompleted && videoUrl) {
           clearInterval(interval);
-          setRawVideoUrl(data.data.video_url);
+          setRawVideoUrl(videoUrl);
           setStatus("adding_captions");
           setIsGenerating(false);
           toast({
             title: t("ads.video.generated"),
             description: t("ads.video.generated.desc")
           });
-        } else if (data.data?.status === "failed") {
+        } else if (isCompleted && !videoUrl) {
+          // Video completed but URL not yet available - keep polling a bit
+          console.log("Video completed but no URL yet, continuing to poll...");
+        } else if (isFailed) {
           clearInterval(interval);
           setStatus("failed");
           setIsGenerating(false);
