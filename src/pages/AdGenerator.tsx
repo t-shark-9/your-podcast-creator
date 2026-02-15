@@ -14,13 +14,15 @@ import {
   RefreshCw,
   LogIn,
   Pencil,
-  Type
+  Type,
+  User
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
+import AvatarVoicePicker from "@/components/podcast/AvatarVoicePicker";
 
 const EXAMPLE_PROMPTS_DE = [
   "Ein modernes Smartphone liegt auf einem minimalistischen Schreibtisch, Sonnenlicht f\u00e4llt durch das Fenster",
@@ -278,10 +280,14 @@ export default function AdGenerator() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {/* Step 1: Avatar & Voice Selection */}
+            <AvatarVoicePicker storagePrefix="joggai_speaker1" />
+
+            {/* Step 2: Prompt */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
+                  <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
                   {t("ads.step1.title")}
                 </CardTitle>
                 <CardDescription>{t("ads.step1.desc")}</CardDescription>
@@ -444,20 +450,27 @@ export default function AdGenerator() {
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { key: "draft", label: language === "de" ? "Prompt eingeben" : "Enter Prompt", icon: Type },
+                    { key: "draft", label: language === "de" ? "Avatar & Stimme wählen" : "Choose Avatar & Voice", icon: User },
+                    { key: "draft", label: language === "de" ? "Prompt eingeben" : "Enter Prompt", icon: Type, subKey: "prompt" },
                     { key: "generating_video", label: language === "de" ? "Video generieren" : "Generate Video", icon: Video },
                     { key: "completed", label: language === "de" ? "Bearbeiten & Herunterladen" : "Edit & Download", icon: CheckCircle2 }
-                  ].map((step) => {
+                  ].map((step, index) => {
                     const Icon = step.icon;
                     const statusOrder: AdStatus[] = ["draft", "generating_video", "completed"];
                     const currentIndex = statusOrder.indexOf(status === "failed" ? "draft" : status);
-                    const stepIndex = statusOrder.indexOf(step.key as AdStatus);
-                    const isActive = step.key === status || (step.key === "draft" && status === "failed");
-                    const isCompleted = stepIndex < currentIndex;
+                    const stepIndex = Math.min(index, 2); // Map 4 UI steps to 3 status steps
+                    const isActive = (index === 0 && status === "draft") ||
+                                     (index === 1 && status === "draft") ||
+                                     (index === 2 && status === "generating_video") ||
+                                     (index === 3 && status === "completed");
+                    const isCompleted = (index === 0 && currentIndex >= 0 && status !== "draft") ||
+                                        (index === 1 && currentIndex >= 1) ||
+                                        (index === 2 && currentIndex >= 2) ||
+                                        (index === 3 && false);
                     
                     return (
                       <div
-                        key={step.key}
+                        key={`${step.key}-${index}`}
                         className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
                           isActive ? "bg-primary/10" : isCompleted ? "bg-green-500/10" : ""
                         }`}

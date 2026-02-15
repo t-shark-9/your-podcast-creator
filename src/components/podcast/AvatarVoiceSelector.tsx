@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, User, Mic, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, User, Mic, RefreshCw, AlertCircle, CheckCircle2, Play, Square, Volume2, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { joggAiService, JoggAiAvatar, JoggAiVoice, PodcastSpeakerConfig } from "@/lib/joggai";
+import { cn } from "@/lib/utils";
 
 interface AvatarVoiceSelectorProps {
   speaker1Name: string;
@@ -42,6 +44,9 @@ export default function AvatarVoiceSelector({
   const [speaker2Avatar, setSpeaker2Avatar] = useState<string>("");
   const [speaker2AvatarType, setSpeaker2AvatarType] = useState<0 | 1>(0);
   const [speaker2Voice, setSpeaker2Voice] = useState<string>("");
+
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -109,6 +114,34 @@ export default function AvatarVoiceSelector({
       setSpeaker2AvatarType(avatarType);
     }
   };
+
+  const playVoicePreview = (voiceId: string, previewUrl?: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (playingVoiceId === voiceId) {
+      setPlayingVoiceId(null);
+      return;
+    }
+    if (!previewUrl) return;
+    const audio = new Audio(previewUrl);
+    audioRef.current = audio;
+    setPlayingVoiceId(voiceId);
+    audio.play().catch(() => setPlayingVoiceId(null));
+    audio.onended = () => { setPlayingVoiceId(null); audioRef.current = null; };
+    audio.onerror = () => { setPlayingVoiceId(null); audioRef.current = null; };
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const handleContinue = () => {
     if (!speaker1Avatar || !speaker1Voice || !speaker2Avatar || !speaker2Voice) {
@@ -234,84 +267,155 @@ export default function AvatarVoiceSelector({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("avs.avatar")}</Label>
-            <Select
-              value={speaker1AvatarType === 1 ? `photo_${speaker1Avatar}` : speaker1Avatar}
-              onValueChange={(val) => handleAvatarChange(1, val)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("avs.avatar.placeholder")} />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
+            <Label className="flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" />
+              {t("avs.avatar")}
+            </Label>
+            <Tabs defaultValue={photoAvatars.length > 0 ? "photo" : "public"} className="w-full">
+              <TabsList className="w-full">
                 {photoAvatars.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.avatar.own")}
-                    </div>
-                    {photoAvatars.map((avatar) => (
-                      <SelectItem key={`photo_${avatar.avatar_id}`} value={`photo_${avatar.avatar_id}`}>
-                        {avatar.name || `Avatar ${avatar.avatar_id}`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <TabsTrigger value="photo" className="flex-1 text-xs">
+                    {t("avs.avatar.own")} ({photoAvatars.length})
+                  </TabsTrigger>
                 )}
-                <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                  {t("avs.avatar.public")}
-                </div>
-                {publicAvatars.slice(0, 50).map((avatar) => (
-                  <SelectItem key={String(avatar.avatar_id)} value={String(avatar.avatar_id)}>
-                    {avatar.name || `Avatar ${avatar.avatar_id}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <TabsTrigger value="public" className="flex-1 text-xs">
+                  {t("avs.avatar.public")} ({publicAvatars.length})
+                </TabsTrigger>
+              </TabsList>
+              {photoAvatars.length > 0 && (
+                <TabsContent value="photo" className="mt-2">
+                  <ScrollArea className="h-[160px]">
+                    <div className="grid grid-cols-4 gap-2">
+                      {photoAvatars.map((avatar) => {
+                        const id = String(avatar.avatar_id);
+                        const isSelected = speaker1Avatar === id && speaker1AvatarType === 1;
+                        const imageUrl = avatar.cover_url || avatar.preview_url;
+                        return (
+                          <button key={`s1-photo-${id}`} onClick={() => handleAvatarChange(1, `photo_${id}`)}
+                            className={cn("relative rounded-lg overflow-hidden border-2 transition-all hover:scale-105",
+                              isSelected ? "border-primary ring-2 ring-primary/30" : "border-border/50 hover:border-primary/40"
+                            )}>
+                            <div className="aspect-square bg-muted">
+                              {imageUrl ? <img src={imageUrl} alt={avatar.name || "Avatar"} className="w-full h-full object-cover" loading="lazy" />
+                                : <div className="w-full h-full flex items-center justify-center"><User className="w-6 h-6 text-muted-foreground" /></div>}
+                              {isSelected && <div className="absolute inset-0 bg-primary/20 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-primary" /></div>}
+                            </div>
+                            <p className="text-[10px] truncate p-1 text-center">{avatar.name || `Avatar ${id}`}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              )}
+              <TabsContent value="public" className="mt-2">
+                <ScrollArea className="h-[160px]">
+                  <div className="grid grid-cols-4 gap-2">
+                    {publicAvatars.slice(0, 50).map((avatar) => {
+                      const id = String(avatar.avatar_id);
+                      const isSelected = speaker1Avatar === id && speaker1AvatarType === 0;
+                      const imageUrl = avatar.cover_url || avatar.preview_url;
+                      return (
+                        <button key={`s1-pub-${id}`} onClick={() => handleAvatarChange(1, id)}
+                          className={cn("relative rounded-lg overflow-hidden border-2 transition-all hover:scale-105",
+                            isSelected ? "border-primary ring-2 ring-primary/30" : "border-border/50 hover:border-primary/40"
+                          )}>
+                          <div className="aspect-square bg-muted">
+                            {imageUrl ? <img src={imageUrl} alt={avatar.name || "Avatar"} className="w-full h-full object-cover" loading="lazy" />
+                              : <div className="w-full h-full flex items-center justify-center"><User className="w-6 h-6 text-muted-foreground" /></div>}
+                            {isSelected && <div className="absolute inset-0 bg-primary/20 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-primary" /></div>}
+                          </div>
+                          <p className="text-[10px] truncate p-1 text-center">{avatar.name || `Avatar ${id}`}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <div className="space-y-2">
-            <Label>{t("avs.voice")}</Label>
-            <Select value={speaker1Voice} onValueChange={setSpeaker1Voice}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("avs.voice.placeholder")} />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
+            <Label className="flex items-center gap-2">
+              <Volume2 className="w-4 h-4" />
+              {t("avs.voice")}
+            </Label>
+            <ScrollArea className="h-[160px] border rounded-lg p-2">
+              <div className="space-y-3">
                 {germanVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.voice.german")}
-                    </div>
-                    {germanVoices.map((voice) => (
-                      <SelectItem key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name} {voice.gender && `(${voice.gender})`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t("avs.voice.german")}</p>
+                    {germanVoices.map((voice) => {
+                      const isSelected = speaker1Voice === voice.voice_id;
+                      const isPlaying = playingVoiceId === voice.voice_id;
+                      return (
+                        <button key={`s1v-${voice.voice_id}`} onClick={() => setSpeaker1Voice(voice.voice_id)}
+                          className={cn("w-full flex items-center gap-2 p-2 rounded-md text-left transition-all text-sm",
+                            isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"
+                          )}>
+                          <span className="flex-1 truncate">{voice.name} {voice.gender && <span className="text-muted-foreground text-xs">({voice.gender})</span>}</span>
+                          {voice.preview_url && (
+                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0"
+                              onClick={(e) => { e.stopPropagation(); playVoicePreview(voice.voice_id, voice.preview_url); }}>
+                              {isPlaying ? <Square className="w-3 h-3 text-primary" /> : <Play className="w-3 h-3" />}
+                            </Button>
+                          )}
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 {englishVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.voice.english")}
-                    </div>
-                    {englishVoices.slice(0, 30).map((voice) => (
-                      <SelectItem key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name} {voice.gender && `(${voice.gender})`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t("avs.voice.english")}</p>
+                    {englishVoices.slice(0, 30).map((voice) => {
+                      const isSelected = speaker1Voice === voice.voice_id;
+                      const isPlaying = playingVoiceId === voice.voice_id;
+                      return (
+                        <button key={`s1v-${voice.voice_id}`} onClick={() => setSpeaker1Voice(voice.voice_id)}
+                          className={cn("w-full flex items-center gap-2 p-2 rounded-md text-left transition-all text-sm",
+                            isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"
+                          )}>
+                          <span className="flex-1 truncate">{voice.name} {voice.gender && <span className="text-muted-foreground text-xs">({voice.gender})</span>}</span>
+                          {voice.preview_url && (
+                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0"
+                              onClick={(e) => { e.stopPropagation(); playVoicePreview(voice.voice_id, voice.preview_url); }}>
+                              {isPlaying ? <Square className="w-3 h-3 text-primary" /> : <Play className="w-3 h-3" />}
+                            </Button>
+                          )}
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 {otherVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.voice.other")}
-                    </div>
-                    {otherVoices.slice(0, 30).map((voice) => (
-                      <SelectItem key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name} {voice.language && `(${voice.language})`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t("avs.voice.other")}</p>
+                    {otherVoices.slice(0, 30).map((voice) => {
+                      const isSelected = speaker1Voice === voice.voice_id;
+                      const isPlaying = playingVoiceId === voice.voice_id;
+                      return (
+                        <button key={`s1v-${voice.voice_id}`} onClick={() => setSpeaker1Voice(voice.voice_id)}
+                          className={cn("w-full flex items-center gap-2 p-2 rounded-md text-left transition-all text-sm",
+                            isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"
+                          )}>
+                          <span className="flex-1 truncate">{voice.name} {voice.language && <span className="text-muted-foreground text-xs">({voice.language})</span>}</span>
+                          {voice.preview_url && (
+                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0"
+                              onClick={(e) => { e.stopPropagation(); playVoicePreview(voice.voice_id, voice.preview_url); }}>
+                              {isPlaying ? <Square className="w-3 h-3 text-primary" /> : <Play className="w-3 h-3" />}
+                            </Button>
+                          )}
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </SelectContent>
-            </Select>
+              </div>
+            </ScrollArea>
           </div>
         </div>
 
@@ -338,84 +442,155 @@ export default function AvatarVoiceSelector({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("avs.avatar")}</Label>
-            <Select
-              value={speaker2AvatarType === 1 ? `photo_${speaker2Avatar}` : speaker2Avatar}
-              onValueChange={(val) => handleAvatarChange(2, val)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("avs.avatar.placeholder")} />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
+            <Label className="flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" />
+              {t("avs.avatar")}
+            </Label>
+            <Tabs defaultValue={photoAvatars.length > 0 ? "photo" : "public"} className="w-full">
+              <TabsList className="w-full">
                 {photoAvatars.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.avatar.own")}
-                    </div>
-                    {photoAvatars.map((avatar) => (
-                      <SelectItem key={`photo_${avatar.avatar_id}`} value={`photo_${avatar.avatar_id}`}>
-                        {avatar.name || `Avatar ${avatar.avatar_id}`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <TabsTrigger value="photo" className="flex-1 text-xs">
+                    {t("avs.avatar.own")} ({photoAvatars.length})
+                  </TabsTrigger>
                 )}
-                <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                  {t("avs.avatar.public")}
-                </div>
-                {publicAvatars.slice(0, 50).map((avatar) => (
-                  <SelectItem key={String(avatar.avatar_id)} value={String(avatar.avatar_id)}>
-                    {avatar.name || `Avatar ${avatar.avatar_id}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <TabsTrigger value="public" className="flex-1 text-xs">
+                  {t("avs.avatar.public")} ({publicAvatars.length})
+                </TabsTrigger>
+              </TabsList>
+              {photoAvatars.length > 0 && (
+                <TabsContent value="photo" className="mt-2">
+                  <ScrollArea className="h-[160px]">
+                    <div className="grid grid-cols-4 gap-2">
+                      {photoAvatars.map((avatar) => {
+                        const id = String(avatar.avatar_id);
+                        const isSelected = speaker2Avatar === id && speaker2AvatarType === 1;
+                        const imageUrl = avatar.cover_url || avatar.preview_url;
+                        return (
+                          <button key={`s2-photo-${id}`} onClick={() => handleAvatarChange(2, `photo_${id}`)}
+                            className={cn("relative rounded-lg overflow-hidden border-2 transition-all hover:scale-105",
+                              isSelected ? "border-primary ring-2 ring-primary/30" : "border-border/50 hover:border-primary/40"
+                            )}>
+                            <div className="aspect-square bg-muted">
+                              {imageUrl ? <img src={imageUrl} alt={avatar.name || "Avatar"} className="w-full h-full object-cover" loading="lazy" />
+                                : <div className="w-full h-full flex items-center justify-center"><User className="w-6 h-6 text-muted-foreground" /></div>}
+                              {isSelected && <div className="absolute inset-0 bg-primary/20 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-primary" /></div>}
+                            </div>
+                            <p className="text-[10px] truncate p-1 text-center">{avatar.name || `Avatar ${id}`}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              )}
+              <TabsContent value="public" className="mt-2">
+                <ScrollArea className="h-[160px]">
+                  <div className="grid grid-cols-4 gap-2">
+                    {publicAvatars.slice(0, 50).map((avatar) => {
+                      const id = String(avatar.avatar_id);
+                      const isSelected = speaker2Avatar === id && speaker2AvatarType === 0;
+                      const imageUrl = avatar.cover_url || avatar.preview_url;
+                      return (
+                        <button key={`s2-pub-${id}`} onClick={() => handleAvatarChange(2, id)}
+                          className={cn("relative rounded-lg overflow-hidden border-2 transition-all hover:scale-105",
+                            isSelected ? "border-primary ring-2 ring-primary/30" : "border-border/50 hover:border-primary/40"
+                          )}>
+                          <div className="aspect-square bg-muted">
+                            {imageUrl ? <img src={imageUrl} alt={avatar.name || "Avatar"} className="w-full h-full object-cover" loading="lazy" />
+                              : <div className="w-full h-full flex items-center justify-center"><User className="w-6 h-6 text-muted-foreground" /></div>}
+                            {isSelected && <div className="absolute inset-0 bg-primary/20 flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-primary" /></div>}
+                          </div>
+                          <p className="text-[10px] truncate p-1 text-center">{avatar.name || `Avatar ${id}`}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <div className="space-y-2">
-            <Label>{t("avs.voice")}</Label>
-            <Select value={speaker2Voice} onValueChange={setSpeaker2Voice}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("avs.voice.placeholder")} />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
+            <Label className="flex items-center gap-2">
+              <Volume2 className="w-4 h-4" />
+              {t("avs.voice")}
+            </Label>
+            <ScrollArea className="h-[160px] border rounded-lg p-2">
+              <div className="space-y-3">
                 {germanVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.voice.german")}
-                    </div>
-                    {germanVoices.map((voice) => (
-                      <SelectItem key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name} {voice.gender && `(${voice.gender})`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t("avs.voice.german")}</p>
+                    {germanVoices.map((voice) => {
+                      const isSelected = speaker2Voice === voice.voice_id;
+                      const isPlaying = playingVoiceId === voice.voice_id;
+                      return (
+                        <button key={`s2v-${voice.voice_id}`} onClick={() => setSpeaker2Voice(voice.voice_id)}
+                          className={cn("w-full flex items-center gap-2 p-2 rounded-md text-left transition-all text-sm",
+                            isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"
+                          )}>
+                          <span className="flex-1 truncate">{voice.name} {voice.gender && <span className="text-muted-foreground text-xs">({voice.gender})</span>}</span>
+                          {voice.preview_url && (
+                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0"
+                              onClick={(e) => { e.stopPropagation(); playVoicePreview(voice.voice_id, voice.preview_url); }}>
+                              {isPlaying ? <Square className="w-3 h-3 text-primary" /> : <Play className="w-3 h-3" />}
+                            </Button>
+                          )}
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 {englishVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.voice.english")}
-                    </div>
-                    {englishVoices.slice(0, 30).map((voice) => (
-                      <SelectItem key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name} {voice.gender && `(${voice.gender})`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t("avs.voice.english")}</p>
+                    {englishVoices.slice(0, 30).map((voice) => {
+                      const isSelected = speaker2Voice === voice.voice_id;
+                      const isPlaying = playingVoiceId === voice.voice_id;
+                      return (
+                        <button key={`s2v-${voice.voice_id}`} onClick={() => setSpeaker2Voice(voice.voice_id)}
+                          className={cn("w-full flex items-center gap-2 p-2 rounded-md text-left transition-all text-sm",
+                            isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"
+                          )}>
+                          <span className="flex-1 truncate">{voice.name} {voice.gender && <span className="text-muted-foreground text-xs">({voice.gender})</span>}</span>
+                          {voice.preview_url && (
+                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0"
+                              onClick={(e) => { e.stopPropagation(); playVoicePreview(voice.voice_id, voice.preview_url); }}>
+                              {isPlaying ? <Square className="w-3 h-3 text-primary" /> : <Play className="w-3 h-3" />}
+                            </Button>
+                          )}
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 {otherVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                      {t("avs.voice.other")}
-                    </div>
-                    {otherVoices.slice(0, 30).map((voice) => (
-                      <SelectItem key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name} {voice.language && `(${voice.language})`}
-                      </SelectItem>
-                    ))}
-                  </>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t("avs.voice.other")}</p>
+                    {otherVoices.slice(0, 30).map((voice) => {
+                      const isSelected = speaker2Voice === voice.voice_id;
+                      const isPlaying = playingVoiceId === voice.voice_id;
+                      return (
+                        <button key={`s2v-${voice.voice_id}`} onClick={() => setSpeaker2Voice(voice.voice_id)}
+                          className={cn("w-full flex items-center gap-2 p-2 rounded-md text-left transition-all text-sm",
+                            isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"
+                          )}>
+                          <span className="flex-1 truncate">{voice.name} {voice.language && <span className="text-muted-foreground text-xs">({voice.language})</span>}</span>
+                          {voice.preview_url && (
+                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0"
+                              onClick={(e) => { e.stopPropagation(); playVoicePreview(voice.voice_id, voice.preview_url); }}>
+                              {isPlaying ? <Square className="w-3 h-3 text-primary" /> : <Play className="w-3 h-3" />}
+                            </Button>
+                          )}
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </SelectContent>
-            </Select>
+              </div>
+            </ScrollArea>
           </div>
         </div>
 
