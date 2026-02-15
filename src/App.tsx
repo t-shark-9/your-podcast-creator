@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/i18n/LanguageContext";
 import Home from "./pages/Home";
 import PodcastCreator from "./pages/PodcastCreator";
 import AdGenerator from "./pages/AdGenerator";
+import Studio from "./pages/Studio";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -24,6 +25,7 @@ const App = () => (
         <BrowserRouter basename={basename}>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/studio" element={<Studio />} />
             <Route path="/podcast" element={<PodcastCreator />} />
             <Route path="/ads" element={<AdGenerator />} />
             <Route path="/auth" element={<Auth />} />

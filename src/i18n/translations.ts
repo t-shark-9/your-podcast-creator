@@ -10,6 +10,9 @@ export const translations = {
   "home.ads.title": { de: "Ad Generator", en: "Ad Generator" },
   "home.ads.description": { de: "Erstelle Werbevideos mit KI, füge Untertitel und Musik hinzu", en: "Create ad videos with AI, add captions and music" },
   "home.ads.cta": { de: "Werbung erstellen", en: "Create Ad" },
+  "home.studio.title": { de: "Podcast Studio", en: "Podcast Studio" },
+  "home.studio.description": { de: "Templates durchstöbern, Stimmen anhören, Avatare entdecken — Talk Show, Interview, Multi-Charakter", en: "Browse templates, listen to voices, discover avatars — Talk Show, Interview, Multi-Character" },
+  "home.studio.cta": { de: "Studio öffnen", en: "Open Studio" },
 
   // Auth
   "auth.title": { de: "Content Studio", en: "Content Studio" },
