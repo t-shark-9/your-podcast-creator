@@ -43,6 +43,7 @@ export default function PodcastCreator() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingLineId, setProcessingLineId] = useState<string | null>(null);
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const EXAMPLE_TOPICS = language === "de" ? EXAMPLE_TOPICS_DE : EXAMPLE_TOPICS_EN;
