@@ -184,12 +184,6 @@ export default function AvatarVoicePicker({
             <h3 className="font-semibold">{t("avs.noapi")}</h3>
             <p className="text-sm text-muted-foreground mt-1">{t("avs.noapi.desc")}</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => (window.location.href = "/settings")}
-          >
-            {t("avs.goto.settings")}
-          </Button>
         </CardContent>
       </Card>
     );

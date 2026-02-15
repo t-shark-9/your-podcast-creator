@@ -144,26 +144,6 @@ export const translations = {
   "ads.workflow.drive": { de: "In Drive speichern", en: "Save to Drive" },
   "ads.workflow.done": { de: "Fertig!", en: "Done!" },
 
-  // Settings
-  "settings.title": { de: "Einstellungen", en: "Settings" },
-  "settings.subtitle": { de: "API Konfiguration", en: "API Configuration" },
-  "settings.joggai.title": { de: "JoggAI API", en: "JoggAI API" },
-  "settings.joggai.desc": { de: "Dein API Key für die Video-Generierung", en: "Your API key for video generation" },
-  "settings.joggai.connected": { de: "Verbunden", en: "Connected" },
-  "settings.joggai.invalid": { de: "Ungültig", en: "Invalid" },
-  "settings.joggai.label": { de: "API Key", en: "API Key" },
-  "settings.joggai.placeholder": { de: "Dein JoggAI API Key", en: "Your JoggAI API Key" },
-  "settings.joggai.connected.as": { de: "Verbunden als:", en: "Connected as:" },
-  "settings.joggai.validate": { de: "Validiere...", en: "Validating..." },
-  "settings.joggai.save": { de: "Speichern & Validieren", en: "Save & Validate" },
-  "settings.joggai.validated": { de: "API Key validiert", en: "API Key validated" },
-  "settings.joggai.validated.desc": { de: "Verbunden als", en: "Connected as" },
-  "settings.joggai.invalid.title": { de: "Ungültiger API Key", en: "Invalid API Key" },
-  "settings.joggai.invalid.desc": { de: "Der API Key konnte nicht validiert werden.", en: "The API key could not be validated." },
-  "settings.joggai.error": { de: "Validierungsfehler", en: "Validation error" },
-  "settings.joggai.error.desc": { de: "Verbindung zu JoggAI fehlgeschlagen.", en: "Connection to JoggAI failed." },
-  "settings.joggai.hint": { de: "Du findest deinen API Key im JoggAI Dashboard unter Settings → API.", en: "Find your API key in the JoggAI Dashboard under Settings → API." },
-
   // DialogueEditor
   "editor.title": { de: "Dialog bearbeiten", en: "Edit Dialogue" },
   "editor.lines": { de: "Dialogzeilen", en: "dialogue lines" },
@@ -246,8 +226,7 @@ export const translations = {
   "avs.incomplete": { de: "Unvollständige Auswahl", en: "Incomplete selection" },
   "avs.incomplete.desc": { de: "Bitte wähle für beide Sprecher einen Avatar und eine Stimme aus.", en: "Please select an avatar and voice for both speakers." },
   "avs.noapi": { de: "JoggAI API nicht konfiguriert", en: "JoggAI API not configured" },
-  "avs.noapi.desc": { de: "Um Avatare und Stimmen auszuwählen, konfiguriere bitte zuerst deinen JoggAI API Key in den Einstellungen.", en: "To select avatars and voices, please configure your JoggAI API Key in Settings first." },
-  "avs.goto.settings": { de: "Zu den Einstellungen", en: "Go to Settings" },
+  "avs.noapi.desc": { de: "Um Avatare und Stimmen auszuwählen, setze bitte die Umgebungsvariable VITE_JOGGAI_API_KEY.", en: "To select avatars and voices, please set the VITE_JOGGAI_API_KEY environment variable." },
 
   // VoiceRecorder
   "voice.title": { de: "Meine Stimmen", en: "My Voices" },

@@ -199,9 +199,6 @@ export default function AvatarVoiceSelector({
               {t("avs.noapi.desc")}
             </p>
           </div>
-          <Button variant="outline" onClick={() => window.location.href = '/settings'}>
-            {t("avs.goto.settings")}
-          </Button>
           {onSkip && (
             <Button variant="ghost" onClick={onSkip}>
               {t("avs.skip")}

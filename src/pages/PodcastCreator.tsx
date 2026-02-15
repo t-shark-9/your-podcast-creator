@@ -3,16 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, Settings, Mic, User, Video, ChevronRight, Film, LogIn } from "lucide-react";
+import { Loader2, Sparkles, Mic, User, Video, ChevronRight, Film, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
 import DialogueEditor from "@/components/podcast/DialogueEditor";
-import VoiceRecorder from "@/components/podcast/VoiceRecorder";
-import AvatarConfig from "@/components/podcast/AvatarConfig";
-import ApiKeyConfig from "@/components/podcast/ApiKeyConfig";
 import VideoGenerator from "@/components/podcast/VideoGenerator";
 import AvatarVoiceSelector from "@/components/podcast/AvatarVoiceSelector";
 import type { DialogueLine, Voice, Avatar, PodcastScript } from "@/types/podcast";
@@ -32,7 +29,7 @@ const EXAMPLE_TOPICS_EN = [
   "Work-life balance: how to successfully combine work and personal life"
 ];
 
-type AppView = "input" | "customize" | "editor" | "settings";
+type AppView = "input" | "customize" | "editor";
 
 export default function PodcastCreator() {
   const [view, setView] = useState<AppView>("input");
@@ -46,8 +43,6 @@ export default function PodcastCreator() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingLineId, setProcessingLineId] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const EXAMPLE_TOPICS = language === "de" ? EXAMPLE_TOPICS_DE : EXAMPLE_TOPICS_EN;
@@ -304,22 +299,6 @@ export default function PodcastCreator() {
     });
   };
 
-  const handleVoiceCreated = (voice: Voice) => {
-    setVoices(prev => [...prev, voice]);
-  };
-
-  const handleVoiceDeleted = (voiceId: string) => {
-    setVoices(prev => prev.filter(v => v.id !== voiceId));
-  };
-
-  const handleAvatarCreated = (avatar: Avatar) => {
-    setAvatars(prev => [...prev, avatar]);
-  };
-
-  const handleAvatarDeleted = (avatarId: string) => {
-    setAvatars(prev => prev.filter(a => a.id !== avatarId));
-  };
-
   const handleSpeakerNameChange = (speaker: "speaker1" | "speaker2", name: string) => {
     if (speaker === "speaker1") {
       setSpeaker1Name(name);
@@ -397,65 +376,6 @@ export default function PodcastCreator() {
     );
   }
 
-  if (view === "settings") {
-    return (
-      <div className="min-h-screen p-4 md:p-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="flex items-center gap-4 mb-6">
-            <Button variant="ghost" onClick={() => setView("input")}>
-              {t("podcast.back")}
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">{t("podcast.settings")}</h1>
-              <p className="text-sm text-muted-foreground">
-                {t("podcast.settings.desc")}
-              </p>
-            </div>
-            <div className="ml-auto">
-              <LanguageToggle />
-            </div>
-          </div>
-
-          <Tabs defaultValue="voices" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="voices" className="gap-2">
-                <Mic className="w-4 h-4" />
-                {t("podcast.voices")}
-              </TabsTrigger>
-              <TabsTrigger value="avatars" className="gap-2">
-                <User className="w-4 h-4" />
-                {t("podcast.avatars")}
-              </TabsTrigger>
-              <TabsTrigger value="api" className="gap-2">
-                <Settings className="w-4 h-4" />
-                API
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="voices" className="mt-4">
-              <VoiceRecorder
-                voices={voices}
-                onVoiceCreated={handleVoiceCreated}
-                onVoiceDeleted={handleVoiceDeleted}
-                isUploading={isUploading}
-              />
-            </TabsContent>
-            <TabsContent value="avatars" className="mt-4">
-              <AvatarConfig
-                avatars={avatars}
-                onAvatarCreated={handleAvatarCreated}
-                onAvatarDeleted={handleAvatarDeleted}
-                isUploading={isUploading}
-              />
-            </TabsContent>
-            <TabsContent value="api" className="mt-4">
-              <ApiKeyConfig />
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    );
-  }
-
   // Main input view
   return (
     <div className="min-h-screen p-4 md:p-8">
@@ -488,15 +408,6 @@ export default function PodcastCreator() {
                 {t("nav.login")}
               </Button>
             </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setView("settings")}
-              className="gap-2"
-            >
-              <Settings className="w-4 h-4" />
-              {t("podcast.settings")}
-            </Button>
           </div>
         </div>
 
@@ -583,14 +494,6 @@ export default function PodcastCreator() {
                     </span>
                   )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setView("settings")}
-                  className="text-xs"
-                >
-                  {t("podcast.manage")}
-                </Button>
               </div>
             </CardContent>
           </Card>
