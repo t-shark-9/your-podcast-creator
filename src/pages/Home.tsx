@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mic, Video, ArrowRight, Sparkles, LayoutTemplate } from "lucide-react";
+import { Mic, Video, ArrowRight, Sparkles, LayoutTemplate, Users, ExternalLink } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
 
@@ -48,6 +48,30 @@ export default function Home() {
                 </div>
                 <Button className="gap-2 group-hover:gap-3 transition-all shrink-0">
                   {t("home.studio.cta")}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Video Podcast Card — Featured */}
+          <Link to="/video-podcast" className="group block mb-6">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:glow-primary">
+              <CardContent className="py-6 flex flex-col sm:flex-row items-center gap-6">
+                <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors shrink-0">
+                  <Users className="w-7 h-7 text-purple-500" />
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <CardTitle className="text-xl flex items-center gap-2 justify-center sm:justify-start">
+                    {t("home.videopodcast.title")}
+                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">2.0</span>
+                  </CardTitle>
+                  <CardDescription className="mt-1.5">
+                    {t("home.videopodcast.description")}
+                  </CardDescription>
+                </div>
+                <Button variant="outline" className="gap-2 group-hover:gap-3 transition-all shrink-0">
+                  {t("home.videopodcast.cta")}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </CardContent>

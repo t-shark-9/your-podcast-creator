@@ -361,14 +361,30 @@ class JoggAiService {
     }
   }
 
+  // Known podcast-style template IDs from JoggAI's public library
+  // These are the closest to "Video Podcast 2.0" templates available via API
+  static readonly PODCAST_TEMPLATE_IDS = [417, 418, 419, 420, 421, 422, 431];
+
   // Find podcast/interview templates from the template list
   async getPodcastTemplates(): Promise<JoggAiTemplate[]> {
     const templates = await this.getTemplates();
     const podcastKeywords = ["podcast", "interview", "dialogue", "talkshow", "talk show", "remote", "conversation", "two speaker", "multi speaker", "dual"];
-    return templates.filter(t => {
+    // First include known podcast template IDs, then keyword matches
+    const knownIds = new Set(JoggAiService.PODCAST_TEMPLATE_IDS.map(String));
+    const knownTemplates = templates.filter(t => knownIds.has(String(t.template_id)));
+    const keywordTemplates = templates.filter(t => {
+      if (knownIds.has(String(t.template_id))) return false; // already included
       const searchText = `${t.name || ""} ${t.category || ""} ${t.description || ""} ${(t.tags || []).join(" ")}`.toLowerCase();
       return podcastKeywords.some(kw => searchText.includes(kw));
     });
+    return [...knownTemplates, ...keywordTemplates];
+  }
+
+  // Get the curated Video Podcast templates specifically (the 7 known podcast templates)
+  async getVideoPodcastTemplates(): Promise<JoggAiTemplate[]> {
+    const templates = await this.getTemplates();
+    const knownIds = new Set(JoggAiService.PODCAST_TEMPLATE_IDS.map(String));
+    return templates.filter(t => knownIds.has(String(t.template_id)));
   }
 
   // Find UGC (user-generated content) templates

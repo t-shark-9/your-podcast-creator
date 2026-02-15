@@ -13,6 +13,9 @@ export const translations = {
   "home.studio.title": { de: "Podcast Studio", en: "Podcast Studio" },
   "home.studio.description": { de: "Templates durchstöbern, Stimmen anhören, Avatare entdecken — Talk Show, Interview, Multi-Charakter", en: "Browse templates, listen to voices, discover avatars — Talk Show, Interview, Multi-Character" },
   "home.studio.cta": { de: "Studio öffnen", en: "Open Studio" },
+  "home.videopodcast.title": { de: "Video Podcast", en: "Video Podcast" },
+  "home.videopodcast.description": { de: "Professionelle Podcast-Templates mit zwei KI-Charakteren im Splitscreen — wähle aus unserer Galerie oder nutze JoggAI Video Podcast 2.0", en: "Professional podcast templates with two AI characters in split screen — choose from our gallery or use JoggAI Video Podcast 2.0" },
+  "home.videopodcast.cta": { de: "Templates entdecken", en: "Browse Templates" },
 
   // Auth
   "auth.title": { de: "Content Studio", en: "Content Studio" },
