@@ -176,17 +176,34 @@ class JoggAiService {
 
   // Get all voices
   async getVoices(): Promise<JoggAiVoice[]> {
-    const data = await this.request<JoggAiVoice[] | { voices: JoggAiVoice[] }>("/voices", {
+    interface RawVoice {
+      voice_id: string;
+      name: string;
+      language?: string;
+      gender?: string;
+      preview_url?: string;
+      audio_url?: string;
+    }
+    const data = await this.request<RawVoice[] | { voices: RawVoice[] }>("/voices", {
       method: "GET",
     });
     // Handle both array response and object with voices property
+    let rawVoices: RawVoice[];
     if (Array.isArray(data)) {
-      return data;
+      rawVoices = data;
+    } else if (data && typeof data === 'object' && 'voices' in data && Array.isArray(data.voices)) {
+      rawVoices = data.voices;
+    } else {
+      return [];
     }
-    if (data && typeof data === 'object' && 'voices' in data && Array.isArray(data.voices)) {
-      return data.voices;
-    }
-    return [];
+    // Map API 'audio_url' field to our standardized 'preview_url' field
+    return rawVoices.map((v) => ({
+      voice_id: v.voice_id,
+      name: v.name,
+      language: v.language,
+      gender: v.gender,
+      preview_url: v.preview_url || v.audio_url,
+    }));
   }
 
   // Create a photo avatar
