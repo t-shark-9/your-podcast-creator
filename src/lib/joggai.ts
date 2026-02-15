@@ -130,32 +130,37 @@ class JoggAiService {
     }));
   }
 
-  // Get user's photo avatars
+  // Get user's photo avatars (optional – gracefully returns [] on failure)
   async getPhotoAvatars(): Promise<JoggAiAvatar[]> {
-    interface PhotoAvatarResponse {
-      avatar_id: string;
-      name: string;
-      cover_url?: string;
-      thumbnail_url?: string;
-      status: number;
+    try {
+      interface PhotoAvatarResponse {
+        avatar_id: string;
+        name: string;
+        cover_url?: string;
+        thumbnail_url?: string;
+        status: number;
+      }
+      
+      // Use correct endpoint for JoggAI v2
+      const data = await this.request<{ avatars: PhotoAvatarResponse[] }>("/photo_avatar?page=1&limit=100", {
+        method: "GET",
+      });
+
+      if (!data?.avatars) return [];
+
+      // Convert to standardized format
+      return data.avatars
+        .map((a) => ({
+          avatar_id: a.avatar_id,
+          name: a.name,
+          preview_url: a.thumbnail_url || a.cover_url,
+          isPhotoAvatar: true,
+          status: a.status,
+        }));
+    } catch (error) {
+      console.warn("Could not load photo avatars (this is optional):", error);
+      return [];
     }
-    
-    // Use correct endpoint for JoggAI v2
-    const data = await this.request<{ avatars: PhotoAvatarResponse[] }>("/photo_avatar?page=1&limit=100", {
-      method: "GET",
-    });
-
-    if (!data?.avatars) return [];
-
-    // Convert to standardized format
-    return data.avatars
-      .map((a) => ({
-        avatar_id: a.avatar_id,
-        name: a.name,
-        preview_url: a.thumbnail_url || a.cover_url,
-        isPhotoAvatar: true,
-        status: a.status,
-      }));
   }
 
   // Get all voices
