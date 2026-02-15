@@ -298,17 +298,63 @@ class JoggAiService {
     return data;
   }
 
-  // Get available templates
+  // Get available templates (public/system + user's custom)
   async getTemplates(): Promise<JoggAiTemplate[]> {
     try {
-      const data = await this.request<JoggAiTemplate[] | { templates: JoggAiTemplate[] }>("/templates", {
-        method: "GET",
-      });
-      if (Array.isArray(data)) return data;
-      if (data && typeof data === 'object' && 'templates' in data && Array.isArray(data.templates)) {
-        return data.templates;
+      interface RawTemplate {
+        id?: number | string;
+        template_id?: number | string;
+        name: string;
+        cover_url?: string;
+        preview_url?: string;
+        tags?: string[];
+        category?: string;
+        description?: string;
+        aspect_ratio?: number | string;
       }
-      return [];
+
+      // Fetch both public and custom templates in parallel
+      const [publicData, customData] = await Promise.all([
+        this.request<RawTemplate[] | { templates: RawTemplate[] }>("/templates", { method: "GET" }),
+        this.request<RawTemplate[] | { templates: RawTemplate[] }>("/templates/custom", { method: "GET" }).catch(() => [] as RawTemplate[]),
+      ]);
+
+      const extractTemplates = (data: RawTemplate[] | { templates: RawTemplate[] }): RawTemplate[] => {
+        if (Array.isArray(data)) return data;
+        if (data && typeof data === 'object' && 'templates' in data && Array.isArray(data.templates)) return data.templates;
+        return [];
+      };
+
+      const mapAspectRatio = (ar?: number | string): string | undefined => {
+        if (ar === 0 || ar === "0") return "portrait";
+        if (ar === 1 || ar === "1") return "landscape";
+        if (ar === 2 || ar === "2") return "square";
+        if (typeof ar === "string") return ar;
+        return undefined;
+      };
+
+      const publicTemplates = extractTemplates(publicData);
+      const customTemplates = extractTemplates(customData);
+
+      // Map API 'id' field to our standardized 'template_id' field
+      const mapTemplate = (t: RawTemplate, isCustom = false): JoggAiTemplate => ({
+        template_id: t.template_id || t.id || 0,
+        name: isCustom ? `★ ${t.name}` : t.name,
+        cover_url: t.cover_url,
+        preview_url: t.preview_url,
+        tags: t.tags,
+        category: t.category,
+        description: t.description,
+        aspect_ratio: mapAspectRatio(t.aspect_ratio),
+      });
+
+      const mapped = [
+        ...customTemplates.map(t => mapTemplate(t, true)),
+        ...publicTemplates.map(t => mapTemplate(t)),
+      ];
+
+      console.log(`Loaded ${publicTemplates.length} public + ${customTemplates.length} custom templates`);
+      return mapped;
     } catch (error) {
       console.warn("Could not load templates:", error);
       return [];
