@@ -308,6 +308,26 @@ class JoggAiService {
     });
   }
 
+  // Find UGC (user-generated content) templates
+  async getUgcTemplates(): Promise<JoggAiTemplate[]> {
+    const templates = await this.getTemplates();
+    const ugcKeywords = ["ugc", "user generated", "testimonial", "review", "unboxing", "reaction", "creator", "influencer", "social media", "tiktok", "reel", "short"];
+    return templates.filter(t => {
+      const searchText = `${t.name || ""} ${t.category || ""} ${t.description || ""} ${(t.tags || []).join(" ")}`.toLowerCase();
+      return ugcKeywords.some(kw => searchText.includes(kw));
+    });
+  }
+
+  // Find promo/advertisement templates
+  async getPromoTemplates(): Promise<JoggAiTemplate[]> {
+    const templates = await this.getTemplates();
+    const promoKeywords = ["promo", "promotion", "ad", "advertisement", "commercial", "product", "marketing", "brand", "sale", "offer", "discount", "launch", "announce"];
+    return templates.filter(t => {
+      const searchText = `${t.name || ""} ${t.category || ""} ${t.description || ""} ${(t.tags || []).join(" ")}`.toLowerCase();
+      return promoKeywords.some(kw => searchText.includes(kw));
+    });
+  }
+
   // Create video from a template
   async createVideoFromTemplate(config: {
     templateId: number | string;

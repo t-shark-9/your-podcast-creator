@@ -15,7 +15,11 @@ import {
   LogIn,
   Pencil,
   Type,
-  User
+  User,
+  LayoutTemplate,
+  Megaphone,
+  Sparkles,
+  Camera
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +27,9 @@ import { Link } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
 import AvatarVoicePicker from "@/components/podcast/AvatarVoicePicker";
+import { joggAiService } from "@/lib/joggai";
+import type { JoggAiTemplate } from "@/lib/joggai";
+import { cn } from "@/lib/utils";
 
 const EXAMPLE_PROMPTS_DE = [
   "Ein modernes Smartphone liegt auf einem minimalistischen Schreibtisch, Sonnenlicht f\u00e4llt durch das Fenster",
@@ -39,8 +46,37 @@ const EXAMPLE_PROMPTS_EN = [
 ];
 
 type AdStatus = "draft" | "generating_video" | "completed" | "failed";
+type AdType = "ugc" | "promo" | "custom";
+
+const AD_TYPES = [
+  { 
+    id: "ugc" as AdType, 
+    icon: Camera, 
+    labelEn: "UGC Video", 
+    labelDe: "UGC Video",
+    descEn: "User-generated content style — testimonials, reviews, unboxing",
+    descDe: "User-Generated-Content — Testimonials, Reviews, Unboxing"
+  },
+  { 
+    id: "promo" as AdType, 
+    icon: Megaphone, 
+    labelEn: "Promo Video", 
+    labelDe: "Promo Video",
+    descEn: "Product promotions, ads, marketing campaigns",
+    descDe: "Produkt-Promotions, Werbung, Marketing-Kampagnen"
+  },
+  { 
+    id: "custom" as AdType, 
+    icon: User, 
+    labelEn: "Custom Avatar", 
+    labelDe: "Eigener Avatar",
+    descEn: "Pick your own avatar & voice, write a script",
+    descDe: "Wähle deinen Avatar & Stimme, schreibe ein Skript"
+  },
+];
 
 export default function AdGenerator() {
+  const [adType, setAdType] = useState<AdType>("ugc");
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState<AdStatus>("draft");
   const [progress, setProgress] = useState(0);
@@ -49,10 +85,27 @@ export default function AdGenerator() {
   const [videoUrl, setVideoUrl] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Template state
+  const [allTemplates, setAllTemplates] = useState<JoggAiTemplate[]>([]);
+  const [ugcTemplates, setUgcTemplates] = useState<JoggAiTemplate[]>([]);
+  const [promoTemplates, setPromoTemplates] = useState<JoggAiTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const EXAMPLE_PROMPTS = language === "de" ? EXAMPLE_PROMPTS_DE : EXAMPLE_PROMPTS_EN;
+
+  // Load templates on mount
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  // Clear selected template when switching ad type
+  useEffect(() => {
+    setSelectedTemplateId("");
+  }, [adType]);
 
   useEffect(() => {
     if (status === "generating_video") {
@@ -76,6 +129,31 @@ export default function AdGenerator() {
       }
     };
   }, []);
+
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const [all, ugc, promo] = await Promise.all([
+        joggAiService.getTemplates(),
+        joggAiService.getUgcTemplates(),
+        joggAiService.getPromoTemplates(),
+      ]);
+      setAllTemplates(all);
+      setUgcTemplates(ugc);
+      setPromoTemplates(promo);
+      console.log(`Loaded ${all.length} templates (${ugc.length} UGC, ${promo.length} Promo)`);
+    } catch (error) {
+      console.warn("Could not load templates:", error);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const getDisplayTemplates = (): JoggAiTemplate[] => {
+    if (adType === "ugc") return ugcTemplates.length > 0 ? ugcTemplates : allTemplates;
+    if (adType === "promo") return promoTemplates.length > 0 ? promoTemplates : allTemplates;
+    return [];
+  };
 
   const generateVideo = async () => {
     if (!prompt.trim()) {
@@ -103,9 +181,39 @@ export default function AdGenerator() {
     setProgress(0);
 
     try {
-      const avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
-      const voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
-      const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
+      let newVideoId: string;
+
+      // ===== Template-based generation (UGC / Promo) =====
+      if (selectedTemplateId && adType !== "custom") {
+        console.log("Using template-based generation, template ID:", selectedTemplateId);
+
+        const variables: Array<{ key: string; value: string }> = [
+          { key: "script", value: prompt.trim() },
+          { key: "text_content", value: prompt.trim() },
+          { key: "product_description", value: prompt.trim() },
+          { key: "ad_copy", value: prompt.trim() },
+          { key: "title", value: prompt.trim().substring(0, 60) },
+        ];
+
+        const avatarId = localStorage.getItem("joggai_speaker1_avatar");
+        const voiceId = localStorage.getItem("joggai_speaker1_voice");
+        if (avatarId) variables.push({ key: "avatar_id", value: avatarId });
+        if (voiceId) variables.push({ key: "voice_id", value: voiceId });
+
+        const result = await joggAiService.createVideoFromTemplate({
+          templateId: selectedTemplateId,
+          variables,
+          videoName: `${adType.toUpperCase()} Ad - ${new Date().toISOString().split("T")[0]}`,
+          aspectRatio: "landscape",
+        });
+
+        newVideoId = result.video_id;
+      }
+      // ===== Avatar-based generation (Custom) =====
+      else {
+        const avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
+        const voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
+        const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
 
       const requestBody = {
         avatar: {
@@ -139,7 +247,9 @@ export default function AdGenerator() {
         throw new Error(data.msg || "Video creation failed");
       }
 
-      const newVideoId = data.data.video_id;
+      newVideoId = data.data.video_id;
+      }
+
       setVideoId(newVideoId);
       
       toast({
@@ -229,6 +339,7 @@ export default function AdGenerator() {
     setVideoUrl("");
     setCoverUrl("");
     setIsGenerating(false);
+    setSelectedTemplateId("");
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
@@ -244,6 +355,10 @@ export default function AdGenerator() {
       default: return status;
     }
   };
+
+  const displayTemplates = getDisplayTemplates();
+  const selectedTemplate = allTemplates.find(t => String(t.template_id) === selectedTemplateId);
+  const isTemplateMode = adType !== "custom";
 
   return (
     <div className="min-h-screen bg-background">
@@ -278,42 +393,244 @@ export default function AdGenerator() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* ===== Ad Type Selector ===== */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            {language === "de" ? "Video-Typ wählen" : "Choose Video Type"}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {AD_TYPES.map((type) => {
+              const Icon = type.icon;
+              const isActive = adType === type.id;
+              return (
+                <button
+                  key={type.id}
+                  onClick={() => setAdType(type.id)}
+                  disabled={status !== "draft"}
+                  className={cn(
+                    "relative flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all text-left",
+                    isActive
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-md"
+                      : "border-border/50 bg-card hover:border-primary/40 hover:bg-muted/30",
+                    status !== "draft" && "opacity-60 cursor-not-allowed"
+                  )}
+                >
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center",
+                    isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                  )}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <span className="font-semibold text-sm">
+                    {language === "de" ? type.labelDe : type.labelEn}
+                  </span>
+                  <span className="text-xs text-muted-foreground text-center leading-tight">
+                    {language === "de" ? type.descDe : type.descEn}
+                  </span>
+                  {isActive && (
+                    <div className="absolute top-2 right-2">
+                      <CheckCircle2 className="w-5 h-5 text-primary" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* Step 1: Avatar & Voice Selection */}
-            <AvatarVoicePicker storagePrefix="joggai_speaker1" />
+            {/* ===== Template Gallery (UGC / Promo) ===== */}
+            {isTemplateMode && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
+                      <LayoutTemplate className="w-4 h-4" />
+                      {language === "de" ? "Template wählen" : "Choose Template"}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadTemplates}
+                      disabled={loadingTemplates}
+                      className="gap-1 h-7 text-xs"
+                    >
+                      <RefreshCw className={cn("w-3 h-3", loadingTemplates && "animate-spin")} />
+                      {language === "de" ? "Neu laden" : "Reload"}
+                    </Button>
+                  </div>
+                  <CardDescription>
+                    {adType === "ugc"
+                      ? (language === "de" 
+                          ? "UGC-Templates — Testimonials, Reviews, Social Media" 
+                          : "UGC templates — testimonials, reviews, social media")
+                      : (language === "de" 
+                          ? "Promo-Templates — Produkt-Werbung, Marketing, Kampagnen" 
+                          : "Promo templates — product ads, marketing, campaigns")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingTemplates ? (
+                    <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {language === "de" ? "Lade Templates..." : "Loading templates..."}
+                    </div>
+                  ) : displayTemplates.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[360px] overflow-y-auto pr-1">
+                        {displayTemplates.map((tmpl) => {
+                          const tid = String(tmpl.template_id);
+                          const isSelected = selectedTemplateId === tid;
+                          return (
+                            <button
+                              key={tid}
+                              onClick={() => setSelectedTemplateId(isSelected ? "" : tid)}
+                              disabled={status !== "draft"}
+                              className={cn(
+                                "relative rounded-lg overflow-hidden border-2 transition-all hover:scale-[1.02] text-left",
+                                isSelected
+                                  ? "border-primary ring-2 ring-primary/30"
+                                  : "border-border/50 hover:border-primary/40",
+                                status !== "draft" && "opacity-60 cursor-not-allowed"
+                              )}
+                            >
+                              {tmpl.cover_url ? (
+                                <img
+                                  src={tmpl.cover_url}
+                                  alt={tmpl.name}
+                                  className="aspect-video w-full object-cover bg-muted"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="aspect-video bg-muted flex items-center justify-center">
+                                  <LayoutTemplate className="w-8 h-8 text-muted-foreground/50" />
+                                </div>
+                              )}
+                              <div className="p-2">
+                                <p className="text-xs font-medium truncate">{tmpl.name || `Template ${tid}`}</p>
+                                {tmpl.tags && tmpl.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {tmpl.tags.slice(0, 2).map((tag) => (
+                                      <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0">{tag}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <div className="absolute top-1.5 right-1.5">
+                                  <CheckCircle2 className="w-5 h-5 text-primary bg-background rounded-full" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
 
-            {/* Step 2: Prompt */}
+                      {selectedTemplate && (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                          {selectedTemplate.cover_url && (
+                            <img src={selectedTemplate.cover_url} alt="" className="w-16 h-10 rounded object-cover" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{selectedTemplate.name}</p>
+                            {selectedTemplate.description && (
+                              <p className="text-xs text-muted-foreground truncate">{selectedTemplate.description}</p>
+                            )}
+                          </div>
+                          <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                        </div>
+                      )}
+
+                      <p className="text-xs text-muted-foreground text-center">
+                        {displayTemplates.length} {language === "de" ? "Templates verfügbar" : "templates available"}
+                        {((adType === "ugc" && ugcTemplates.length === 0) || (adType === "promo" && promoTemplates.length === 0)) && (
+                          <span className="ml-1">
+                            ({language === "de" ? "alle Templates angezeigt" : "showing all templates"})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <LayoutTemplate className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">{language === "de" ? "Keine Templates gefunden" : "No templates found"}</p>
+                      <Button variant="ghost" size="sm" className="mt-2" onClick={loadTemplates}>
+                        {language === "de" ? "Erneut versuchen" : "Try again"}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Avatar & Voice Selection (Custom mode only) */}
+            {adType === "custom" && (
+              <AvatarVoicePicker storagePrefix="joggai_speaker1" />
+            )}
+
+            {/* Step: Prompt / Script */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
-                  {t("ads.step1.title")}
+                  {isTemplateMode
+                    ? (language === "de" ? "Skript / Produktbeschreibung" : "Script / Product Description")
+                    : t("ads.step1.title")}
                 </CardTitle>
-                <CardDescription>{t("ads.step1.desc")}</CardDescription>
+                <CardDescription>
+                  {isTemplateMode
+                    ? (language === "de" 
+                        ? "Beschreibe dein Produkt oder schreibe das Skript für das Video"
+                        : "Describe your product or write the script for the video")
+                    : t("ads.step1.desc")}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder={t("ads.placeholder")}
+                  placeholder={isTemplateMode
+                    ? (language === "de" 
+                        ? "z.B. Unser neues Produkt revolutioniert die Art und Weise, wie Sie arbeiten..."
+                        : "e.g. Our new product revolutionizes the way you work...")
+                    : t("ads.placeholder")}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   className="min-h-[100px]"
                   disabled={status !== "draft"}
                 />
-                <div className="flex flex-wrap gap-2">
-                  {EXAMPLE_PROMPTS.map((example, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPrompt(example)}
-                      disabled={status !== "draft"}
-                      className="text-xs"
-                    >
-                      {example.substring(0, 40)}...
-                    </Button>
-                  ))}
-                </div>
+                {adType === "custom" && (
+                  <div className="flex flex-wrap gap-2">
+                    {EXAMPLE_PROMPTS.map((example, i) => (
+                      <Button
+                        key={i}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPrompt(example)}
+                        disabled={status !== "draft"}
+                        className="text-xs"
+                      >
+                        {example.substring(0, 40)}...
+                      </Button>
+                    ))}
+                  </div>
+                )}
+
+                {isTemplateMode && selectedTemplateId && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <LayoutTemplate className="w-3 h-3" />
+                    {language === "de" ? "Generierung via Template" : "Template-based generation"}
+                    <Badge variant="secondary" className="text-[10px]">{selectedTemplate?.name || selectedTemplateId}</Badge>
+                  </div>
+                )}
+                {isTemplateMode && !selectedTemplateId && (
+                  <div className="flex items-center gap-2 text-xs text-amber-600">
+                    <LayoutTemplate className="w-3 h-3" />
+                    {language === "de" ? "Wähle oben ein Template aus oder generiere mit Avatar" : "Select a template above or generate with avatar"}
+                  </div>
+                )}
+
                 <Button
                   onClick={generateVideo}
                   disabled={isGenerating || !prompt.trim() || status === "generating_video"}
@@ -449,51 +766,66 @@ export default function AdGenerator() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {[
-                    { key: "draft", label: language === "de" ? "Avatar & Stimme wählen" : "Choose Avatar & Voice", icon: User },
-                    { key: "draft", label: language === "de" ? "Prompt eingeben" : "Enter Prompt", icon: Type, subKey: "prompt" },
-                    { key: "generating_video", label: language === "de" ? "Video generieren" : "Generate Video", icon: Video },
-                    { key: "completed", label: language === "de" ? "Bearbeiten & Herunterladen" : "Edit & Download", icon: CheckCircle2 }
-                  ].map((step, index) => {
-                    const Icon = step.icon;
-                    const statusOrder: AdStatus[] = ["draft", "generating_video", "completed"];
-                    const currentIndex = statusOrder.indexOf(status === "failed" ? "draft" : status);
-                    const stepIndex = Math.min(index, 2); // Map 4 UI steps to 3 status steps
-                    const isActive = (index === 0 && status === "draft") ||
-                                     (index === 1 && status === "draft") ||
-                                     (index === 2 && status === "generating_video") ||
-                                     (index === 3 && status === "completed");
-                    const isCompleted = (index === 0 && currentIndex >= 0 && status !== "draft") ||
-                                        (index === 1 && currentIndex >= 1) ||
-                                        (index === 2 && currentIndex >= 2) ||
-                                        (index === 3 && false);
-                    
-                    return (
-                      <div
-                        key={`${step.key}-${index}`}
-                        className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
-                          isActive ? "bg-primary/10" : isCompleted ? "bg-green-500/10" : ""
-                        }`}
-                      >
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          isCompleted ? "bg-green-500 text-white" :
-                          isActive ? "bg-primary text-primary-foreground" :
-                          "bg-muted text-muted-foreground"
-                        }`}>
-                          {isCompleted ? (
-                            <CheckCircle2 className="w-4 h-4" />
-                          ) : isActive && status === "generating_video" ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Icon className="w-3 h-3" />
-                          )}
+                  {(() => {
+                    const steps = isTemplateMode
+                      ? [
+                          { label: language === "de" ? "Video-Typ wählen" : "Choose Video Type", icon: Sparkles },
+                          { label: language === "de" ? "Template auswählen" : "Select Template", icon: LayoutTemplate },
+                          { label: language === "de" ? "Skript eingeben" : "Enter Script", icon: Type },
+                          { label: language === "de" ? "Video generieren" : "Generate Video", icon: Video },
+                          { label: language === "de" ? "Bearbeiten & Herunterladen" : "Edit & Download", icon: CheckCircle2 }
+                        ]
+                      : [
+                          { label: language === "de" ? "Video-Typ wählen" : "Choose Video Type", icon: Sparkles },
+                          { label: language === "de" ? "Avatar & Stimme wählen" : "Choose Avatar & Voice", icon: User },
+                          { label: language === "de" ? "Prompt eingeben" : "Enter Prompt", icon: Type },
+                          { label: language === "de" ? "Video generieren" : "Generate Video", icon: Video },
+                          { label: language === "de" ? "Bearbeiten & Herunterladen" : "Edit & Download", icon: CheckCircle2 }
+                        ];
+
+                    let activeIndex = 0;
+                    if (status === "draft") {
+                      if (isTemplateMode && selectedTemplateId) activeIndex = 2;
+                      else if (isTemplateMode) activeIndex = 1;
+                      else activeIndex = 1;
+                      if (prompt.trim()) activeIndex = Math.max(activeIndex, 2);
+                    } else if (status === "generating_video") {
+                      activeIndex = 3;
+                    } else if (status === "completed") {
+                      activeIndex = 4;
+                    }
+
+                    return steps.map((step, index) => {
+                      const Icon = step.icon;
+                      const isActive = index === activeIndex;
+                      const isCompleted = index < activeIndex;
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                            isActive ? "bg-primary/10" : isCompleted ? "bg-green-500/10" : ""
+                          }`}
+                        >
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                            isCompleted ? "bg-green-500 text-white" :
+                            isActive ? "bg-primary text-primary-foreground" :
+                            "bg-muted text-muted-foreground"
+                          }`}>
+                            {isCompleted ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : isActive && status === "generating_video" ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Icon className="w-3 h-3" />
+                            )}
+                          </div>
+                          <span className={`text-sm ${isActive ? "font-medium" : isCompleted ? "text-muted-foreground" : ""}`}>
+                            {step.label}
+                          </span>
                         </div>
-                        <span className={`text-sm ${isActive ? "font-medium" : isCompleted ? "text-muted-foreground" : ""}`}>
-                          {step.label}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </CardContent>
             </Card>
