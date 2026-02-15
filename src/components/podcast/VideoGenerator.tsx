@@ -14,6 +14,7 @@ import { joggAiService } from "@/lib/joggai";
 import type { JoggAiTemplate } from "@/lib/joggai";
 import type { DialogueLine } from "@/types/podcast";
 import type { PodcastSpeakerConfig } from "@/lib/joggai";
+import { cn } from "@/lib/utils";
 
 interface VideoGeneratorProps {
   dialogue: DialogueLine[];
@@ -63,12 +64,14 @@ export default function VideoGenerator({
   const [showSettings, setShowSettings] = useState(false);
 
   // Template state
+  const [allTemplates, setAllTemplates] = useState<JoggAiTemplate[]>([]);
   const [podcastTemplates, setPodcastTemplates] = useState<JoggAiTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
     localStorage.getItem("video_template_id") || ""
   );
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [generationMethod, setGenerationMethod] = useState<"template" | "avatar" | null>(null);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
 
   // Video settings
   const [aspectRatio, setAspectRatio] = useState<string>(
@@ -117,11 +120,15 @@ export default function VideoGenerator({
   const loadTemplates = async () => {
     setLoadingTemplates(true);
     try {
-      const templates = await joggAiService.getPodcastTemplates();
-      setPodcastTemplates(templates);
-      console.log("Found podcast templates:", templates);
+      const [all, podcast] = await Promise.all([
+        joggAiService.getTemplates(),
+        joggAiService.getPodcastTemplates(),
+      ]);
+      setAllTemplates(all);
+      setPodcastTemplates(podcast);
+      console.log(`Loaded ${all.length} templates (${podcast.length} podcast-related)`);
     } catch (error) {
-      console.warn("Could not load podcast templates:", error);
+      console.warn("Could not load templates:", error);
     } finally {
       setLoadingTemplates(false);
     }
@@ -576,53 +583,126 @@ export default function VideoGenerator({
               {t("video.settings")}
             </h4>
 
-            {/* Template Selection */}
-            <div className="space-y-2">
-              <Label className="text-xs flex items-center gap-1">
-                <LayoutTemplate className="w-3 h-3" />
-                Podcast Template
-              </Label>
+            {/* Template Gallery */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs flex items-center gap-1">
+                  <LayoutTemplate className="w-3 h-3" />
+                  Template
+                </Label>
+                <div className="flex items-center gap-1">
+                  {allTemplates.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllTemplates(!showAllTemplates)}
+                      className="h-7 text-xs gap-1"
+                    >
+                      {showAllTemplates ? "Show Recommended" : `Browse All (${allTemplates.length})`}
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={loadTemplates} disabled={loadingTemplates} className="gap-1 h-7 text-xs">
+                    <RefreshCw className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
               {loadingTemplates ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Loading templates...
                 </div>
-              ) : podcastTemplates.length > 0 ? (
-                <div className="space-y-2">
-                  <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Auto-select best template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Auto-select</SelectItem>
-                      {podcastTemplates.map((tmpl) => (
-                        <SelectItem key={String(tmpl.template_id)} value={String(tmpl.template_id)}>
-                          {tmpl.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedTemplateId && (
-                    <div className="flex items-center gap-2">
-                      {podcastTemplates.find(t => String(t.template_id) === selectedTemplateId)?.cover_url && (
-                        <img
-                          src={podcastTemplates.find(t => String(t.template_id) === selectedTemplateId)!.cover_url}
-                          alt="Template preview"
-                          className="h-16 rounded border object-cover"
-                        />
-                      )}
+              ) : (() => {
+                const displayTemplates = showAllTemplates ? allTemplates : podcastTemplates;
+                return displayTemplates.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[240px] overflow-y-auto pr-1">
+                      {/* No template / auto option */}
+                      <button
+                        onClick={() => setSelectedTemplateId("")}
+                        className={cn(
+                          "relative rounded-lg overflow-hidden border-2 transition-all hover:scale-[1.02]",
+                          !selectedTemplateId
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-border/50 hover:border-primary/40"
+                        )}
+                      >
+                        <div className="aspect-video bg-muted flex items-center justify-center">
+                          <Video className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <p className="text-[10px] truncate p-1.5 text-center font-medium">Auto / Avatar</p>
+                        {!selectedTemplateId && (
+                          <div className="absolute top-1 right-1">
+                            <CheckCircle2 className="w-4 h-4 text-primary bg-background rounded-full" />
+                          </div>
+                        )}
+                      </button>
+                      {displayTemplates.map((tmpl) => {
+                        const tid = String(tmpl.template_id);
+                        const isSelected = selectedTemplateId === tid;
+                        const isPodcast = podcastTemplates.some(p => String(p.template_id) === tid);
+                        return (
+                          <button
+                            key={tid}
+                            onClick={() => setSelectedTemplateId(tid)}
+                            className={cn(
+                              "relative rounded-lg overflow-hidden border-2 transition-all hover:scale-[1.02]",
+                              isSelected
+                                ? "border-primary ring-2 ring-primary/30"
+                                : "border-border/50 hover:border-primary/40"
+                            )}
+                          >
+                            <div className="aspect-video bg-muted">
+                              {tmpl.cover_url ? (
+                                <img
+                                  src={tmpl.cover_url}
+                                  alt={tmpl.name}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <LayoutTemplate className="w-6 h-6 text-muted-foreground" />
+                                </div>
+                              )}
+                              {isSelected && (
+                                <div className="absolute top-1 right-1">
+                                  <CheckCircle2 className="w-4 h-4 text-primary bg-background rounded-full" />
+                                </div>
+                              )}
+                              {isPodcast && showAllTemplates && (
+                                <div className="absolute top-1 left-1">
+                                  <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4">Podcast</Badge>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-[10px] truncate p-1.5 text-center">{tmpl.name}</p>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  No podcast templates found — will use avatar-based generation
-                </p>
-              )}
-              <Button variant="ghost" size="sm" onClick={loadTemplates} disabled={loadingTemplates} className="gap-1 h-7 text-xs">
-                <RefreshCw className="w-3 h-3" />
-                Refresh templates
-              </Button>
+                    {selectedTemplateId && (() => {
+                      const sel = displayTemplates.find(t => String(t.template_id) === selectedTemplateId);
+                      return sel ? (
+                        <div className="p-2 bg-primary/5 rounded-md border border-primary/20">
+                          <p className="text-xs font-medium">{sel.name}</p>
+                          {sel.description && <p className="text-[10px] text-muted-foreground mt-0.5">{sel.description}</p>}
+                          {sel.tags && sel.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {sel.tags.map(tag => (
+                                <Badge key={tag} variant="outline" className="text-[8px] px-1 py-0 h-4">{tag}</Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground py-3 text-center">
+                    No templates found — will use avatar-based generation
+                  </p>
+                );
+              })()}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -768,16 +848,43 @@ export default function VideoGenerator({
                     {t("video.download")}
                   </Button>
                 </div>
+
+                {/* JoggAI Editor link */}
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => {
+                    const editorUrl = `https://app.jogg.ai/editor?id=${videoJob.videoId}&index=0&from=projects`;
+                    window.open(editorUrl, "_blank");
+                  }}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {t("video.edit.joggai") || "Edit in JoggAI Editor"}
+                </Button>
               </>
             ) : (
               <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20 space-y-2">
                 <p className="text-sm text-green-600">
                   {t("video.completed.nourl")}
                 </p>
-                <Button variant="outline" size="sm" onClick={handleManualRefresh} className="gap-1">
-                  <RefreshCw className="w-3 h-3" />
-                  {t("video.refresh")}
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleManualRefresh} className="gap-1">
+                    <RefreshCw className="w-3 h-3" />
+                    {t("video.refresh")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 border-primary/30 text-primary"
+                    onClick={() => {
+                      const editorUrl = `https://app.jogg.ai/editor?id=${videoJob.videoId}&index=0&from=projects`;
+                      window.open(editorUrl, "_blank");
+                    }}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    {t("video.edit.joggai") || "Edit in JoggAI Editor"}
+                  </Button>
+                </div>
               </div>
             )}
 

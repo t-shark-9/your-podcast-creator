@@ -186,6 +186,7 @@ export const translations = {
   "video.badge.failed": { de: "Fehlgeschlagen", en: "Failed" },
   "video.watch": { de: "Video ansehen", en: "Watch Video" },
   "video.download": { de: "Herunterladen", en: "Download" },
+  "video.edit.joggai": { de: "Im JoggAI Editor bearbeiten", en: "Edit in JoggAI Editor" },
   "video.new": { de: "Neues Video erstellen", en: "Create New Video" },
   "video.failed.message": { de: "Die Video-Generierung ist fehlgeschlagen. Bitte versuche es erneut.", en: "Video generation failed. Please try again." },
   "video.retry": { de: "Erneut versuchen", en: "Try Again" },
