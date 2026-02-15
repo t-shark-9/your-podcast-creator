@@ -41,6 +41,17 @@ export interface CreatePhotoAvatarResponse {
   status: number;
 }
 
+export interface JoggAiTemplate {
+  template_id: number | string;
+  name: string;
+  cover_url?: string;
+  preview_url?: string;
+  tags?: string[];
+  category?: string;
+  description?: string;
+  aspect_ratio?: string;
+}
+
 class JoggAiService {
   private getApiKey(): string {
     return localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
@@ -266,6 +277,52 @@ class JoggAiService {
       progress?: number;
     }>(`/avatar_video/${videoId}`, {
       method: "GET",
+    });
+    return data;
+  }
+
+  // Get available templates
+  async getTemplates(): Promise<JoggAiTemplate[]> {
+    try {
+      const data = await this.request<JoggAiTemplate[] | { templates: JoggAiTemplate[] }>("/templates", {
+        method: "GET",
+      });
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object' && 'templates' in data && Array.isArray(data.templates)) {
+        return data.templates;
+      }
+      return [];
+    } catch (error) {
+      console.warn("Could not load templates:", error);
+      return [];
+    }
+  }
+
+  // Find podcast/interview templates from the template list
+  async getPodcastTemplates(): Promise<JoggAiTemplate[]> {
+    const templates = await this.getTemplates();
+    const podcastKeywords = ["podcast", "interview", "dialogue", "talkshow", "talk show", "remote", "conversation", "two speaker", "multi speaker", "dual"];
+    return templates.filter(t => {
+      const searchText = `${t.name || ""} ${t.category || ""} ${t.description || ""} ${(t.tags || []).join(" ")}`.toLowerCase();
+      return podcastKeywords.some(kw => searchText.includes(kw));
+    });
+  }
+
+  // Create video from a template
+  async createVideoFromTemplate(config: {
+    templateId: number | string;
+    variables: Array<{ key: string; value: string }>;
+    videoName?: string;
+    aspectRatio?: "landscape" | "portrait" | "square";
+  }): Promise<{ video_id: string }> {
+    const data = await this.request<{ video_id: string }>("/create_video_from_template", {
+      method: "POST",
+      body: JSON.stringify({
+        template_id: typeof config.templateId === "string" ? parseInt(config.templateId, 10) : config.templateId,
+        variables: config.variables,
+        video_name: config.videoName || "Podcast Video",
+        aspect_ratio: config.aspectRatio || "landscape",
+      }),
     });
     return data;
   }

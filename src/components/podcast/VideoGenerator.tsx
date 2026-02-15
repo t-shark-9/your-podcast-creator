@@ -6,10 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Video, CheckCircle2, AlertCircle, Download, ExternalLink, Play, RefreshCw, Settings2 } from "lucide-react";
+import { Loader2, Video, CheckCircle2, AlertCircle, Download, ExternalLink, Play, RefreshCw, Settings2, LayoutTemplate } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { joggAiService } from "@/lib/joggai";
+import type { JoggAiTemplate } from "@/lib/joggai";
 import type { DialogueLine } from "@/types/podcast";
 import type { PodcastSpeakerConfig } from "@/lib/joggai";
 
@@ -60,6 +62,14 @@ export default function VideoGenerator({
   const [progress, setProgress] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Template state
+  const [podcastTemplates, setPodcastTemplates] = useState<JoggAiTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
+    localStorage.getItem("video_template_id") || ""
+  );
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [generationMethod, setGenerationMethod] = useState<"template" | "avatar" | null>(null);
+
   // Video settings
   const [aspectRatio, setAspectRatio] = useState<string>(
     localStorage.getItem("video_aspect_ratio") || "landscape"
@@ -89,6 +99,33 @@ export default function VideoGenerator({
   useEffect(() => {
     localStorage.setItem("video_captions", String(captionsEnabled));
   }, [captionsEnabled]);
+
+  // Persist selected template
+  useEffect(() => {
+    if (selectedTemplateId) {
+      localStorage.setItem("video_template_id", selectedTemplateId);
+    } else {
+      localStorage.removeItem("video_template_id");
+    }
+  }, [selectedTemplateId]);
+
+  // Load podcast templates on mount
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const templates = await joggAiService.getPodcastTemplates();
+      setPodcastTemplates(templates);
+      console.log("Found podcast templates:", templates);
+    } catch (error) {
+      console.warn("Could not load podcast templates:", error);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -180,8 +217,77 @@ export default function VideoGenerator({
 
     setIsGenerating(true);
     setProgress(0);
+    setGenerationMethod(null);
 
     try {
+      // ========== Try template-based generation first ==========
+      const templateToUse = selectedTemplateId
+        ? podcastTemplates.find(t => String(t.template_id) === selectedTemplateId)
+        : podcastTemplates[0]; // Auto-use first podcast template if available
+
+      if (templateToUse) {
+        try {
+          console.log("Attempting template-based generation with template:", templateToUse);
+
+          // Build a combined dialogue text for the template
+          const dialogueText = dialogue.map(line => {
+            const speakerLabel = line.speaker === "speaker1" ? speaker1Name : speaker2Name;
+            return `${speakerLabel}: ${line.text}`;
+          }).join("\n\n");
+
+          // Also prepare per-speaker scripts
+          const { speaker1Script, speaker2Script } = getSpeakerScripts();
+
+          // Template variables – try common variable names
+          const variables: Array<{ key: string; value: string }> = [
+            { key: "text_content", value: dialogueText },
+            { key: "script", value: dialogueText },
+            { key: "dialogue", value: dialogueText },
+            { key: "speaker_a_script", value: speaker1Script },
+            { key: "speaker_b_script", value: speaker2Script },
+            { key: "speaker_a_name", value: speaker1Name },
+            { key: "speaker_b_name", value: speaker2Name },
+            { key: "title", value: `${speaker1Name} & ${speaker2Name} Podcast` },
+          ];
+
+          // If speaker configs have avatar/voice info, include them
+          if (speaker1Config) {
+            variables.push({ key: "avatar_a", value: String(speaker1Config.avatarId) });
+            variables.push({ key: "voice_a", value: speaker1Config.voiceId });
+          }
+          if (speaker2Config) {
+            variables.push({ key: "avatar_b", value: String(speaker2Config.avatarId) });
+            variables.push({ key: "voice_b", value: speaker2Config.voiceId });
+          }
+
+          const result = await joggAiService.createVideoFromTemplate({
+            templateId: templateToUse.template_id,
+            variables,
+            videoName: `${speaker1Name} & ${speaker2Name} Podcast`,
+            aspectRatio: aspectRatio as "landscape" | "portrait" | "square",
+          });
+
+          setGenerationMethod("template");
+          setVideoJob({
+            videoId: result.video_id,
+            status: "processing",
+          });
+
+          toast({
+            title: t("video.started"),
+            description: `Using template: ${templateToUse.name}`,
+          });
+
+          startPolling(result.video_id);
+          return; // Success – don't fall through to avatar method
+        } catch (templateError) {
+          console.warn("Template-based generation failed, falling back to avatar method:", templateError);
+        }
+      }
+
+      // ========== Fallback: avatar-based generation ==========
+      setGenerationMethod("avatar");
+
       // --- Speaker 1 config ---
       let avatar1Id: number;
       let avatar1Type: number;
@@ -221,8 +327,9 @@ export default function VideoGenerator({
       if (!voice2Id || voice2Id.trim() === "") voice2Id = "en-US-JennyNeural";
 
       // Build the dialogue script with [A]/[B] turn markers
-      const dialogueScript = getDialogueScript();
-      // Also get separate per-speaker scripts as fallback
+      // (kept for potential future use in single-input dialogue APIs)
+      // const dialogueScript = getDialogueScript();
+      // Get separate per-speaker scripts
       const { speaker1Script, speaker2Script } = getSpeakerScripts();
 
       // Use the proper two-speaker podcast format:
@@ -468,6 +575,56 @@ export default function VideoGenerator({
               <Settings2 className="w-4 h-4" />
               {t("video.settings")}
             </h4>
+
+            {/* Template Selection */}
+            <div className="space-y-2">
+              <Label className="text-xs flex items-center gap-1">
+                <LayoutTemplate className="w-3 h-3" />
+                Podcast Template
+              </Label>
+              {loadingTemplates ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Loading templates...
+                </div>
+              ) : podcastTemplates.length > 0 ? (
+                <div className="space-y-2">
+                  <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Auto-select best template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Auto-select</SelectItem>
+                      {podcastTemplates.map((tmpl) => (
+                        <SelectItem key={String(tmpl.template_id)} value={String(tmpl.template_id)}>
+                          {tmpl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedTemplateId && (
+                    <div className="flex items-center gap-2">
+                      {podcastTemplates.find(t => String(t.template_id) === selectedTemplateId)?.cover_url && (
+                        <img
+                          src={podcastTemplates.find(t => String(t.template_id) === selectedTemplateId)!.cover_url}
+                          alt="Template preview"
+                          className="h-16 rounded border object-cover"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No podcast templates found — will use avatar-based generation
+                </p>
+              )}
+              <Button variant="ghost" size="sm" onClick={loadTemplates} disabled={loadingTemplates} className="gap-1 h-7 text-xs">
+                <RefreshCw className="w-3 h-3" />
+                Refresh templates
+              </Button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs">{t("video.settings.aspect")}</Label>
@@ -544,10 +701,21 @@ export default function VideoGenerator({
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {t("video.processing")}
               </div>
-              <Button variant="ghost" size="sm" onClick={handleManualRefresh} className="gap-1">
-                <RefreshCw className="w-3 h-3" />
-                {t("video.refresh")}
-              </Button>
+              <div className="flex items-center gap-2">
+                {generationMethod && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    {generationMethod === "template" ? (
+                      <><LayoutTemplate className="w-3 h-3" /> Template</>
+                    ) : (
+                      <><Video className="w-3 h-3" /> Avatar</>
+                    )}
+                  </Badge>
+                )}
+                <Button variant="ghost" size="sm" onClick={handleManualRefresh} className="gap-1">
+                  <RefreshCw className="w-3 h-3" />
+                  {t("video.refresh")}
+                </Button>
+              </div>
             </div>
             <Progress value={progress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
