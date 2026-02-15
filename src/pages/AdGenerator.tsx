@@ -1,100 +1,63 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { 
   Loader2, 
-  Sparkles, 
   Video, 
-  Wand2, 
-  Music, 
-  Type, 
-  FolderOpen, 
   Download,
   ExternalLink,
   Play,
-  ArrowRight,
   CheckCircle2,
-  Settings,
   RefreshCw,
-  Mic,
-  LogIn
+  LogIn,
+  Pencil,
+  Type
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
-import type { AdProject, AdProjectStatus, CaptionStyle } from "@/types/podcast";
 
 const EXAMPLE_PROMPTS_DE = [
-  "Ein modernes Smartphone liegt auf einem minimalistischen Schreibtisch, Sonnenlicht fällt durch das Fenster",
+  "Ein modernes Smartphone liegt auf einem minimalistischen Schreibtisch, Sonnenlicht f\u00e4llt durch das Fenster",
   "Eine junge Frau joggt durch einen herbstlichen Park bei Sonnenaufgang",
-  "Ein Kaffeebecher dampft in einem gemütlichen Café mit Regentropfen am Fenster",
-  "Ein Elektroauto fährt durch eine futuristische Stadt bei Nacht mit Neonlichtern"
+  "Ein Kaffeebecher dampft in einem gem\u00fctlichen Caf\u00e9 mit Regentropfen am Fenster",
+  "Ein Elektroauto f\u00e4hrt durch eine futuristische Stadt bei Nacht mit Neonlichtern"
 ];
 
 const EXAMPLE_PROMPTS_EN = [
   "A modern smartphone sits on a minimalist desk, sunlight streaming through the window",
   "A young woman jogs through an autumn park at sunrise",
-  "A coffee cup steams in a cozy café with raindrops on the window",
+  "A coffee cup steams in a cozy caf\u00e9 with raindrops on the window",
   "An electric car drives through a futuristic city at night with neon lights"
 ];
 
-const CAPTION_STYLES: { id: string; name: string; preview_de: string; preview_en: string }[] = [
-  { id: "modern", name: "Modern", preview_de: "Weiß mit Schatten", preview_en: "White with shadow" },
-  { id: "bold", name: "Bold", preview_de: "Gelb auf Schwarz", preview_en: "Yellow on black" },
-  { id: "minimal", name: "Minimal", preview_de: "Weiß transparent", preview_en: "White transparent" },
-  { id: "dynamic", name: "Dynamic", preview_de: "Animierte Wörter", preview_en: "Animated words" }
-];
-
-const MUSIC_GENRES_DATA = [
-  { id: "upbeat", name: "Upbeat", desc_de: "Energisch & motivierend", desc_en: "Energetic & motivating" },
-  { id: "chill", name: "Chill", desc_de: "Entspannt & modern", desc_en: "Relaxed & modern" },
-  { id: "cinematic", name: "Cinematic", desc_de: "Episch & dramatisch", desc_en: "Epic & dramatic" },
-  { id: "corporate", name: "Corporate", desc_de: "Professionell & sauber", desc_en: "Professional & clean" },
-  { id: "none", name_de: "Keine Musik", name_en: "No Music", desc_de: "Nur Originalton", desc_en: "Original audio only" }
-];
+type AdStatus = "draft" | "generating_video" | "completed" | "failed";
 
 export default function AdGenerator() {
   const [prompt, setPrompt] = useState("");
-  const [enhancedPrompt, setEnhancedPrompt] = useState("");
-  const [status, setStatus] = useState<AdProjectStatus>("draft");
+  const [status, setStatus] = useState<AdStatus>("draft");
   const [progress, setProgress] = useState(0);
-  const [isEnhancing, setIsEnhancing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [rawVideoUrl, setRawVideoUrl] = useState("");
-  const [captionedVideoUrl, setCaptionedVideoUrl] = useState("");
-  const [selectedCaptionStyle, setSelectedCaptionStyle] = useState("modern");
-  const [selectedMusicGenre, setSelectedMusicGenre] = useState("upbeat");
-  const [captionText, setCaptionText] = useState("");
-  const [googleDriveFolderId, setGoogleDriveFolderId] = useState("");
-  const [isSavingToDrive, setIsSavingToDrive] = useState(false);
-  const [driveUrl, setDriveUrl] = useState("");
+  const [videoId, setVideoId] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const EXAMPLE_PROMPTS = language === "de" ? EXAMPLE_PROMPTS_DE : EXAMPLE_PROMPTS_EN;
-  const MUSIC_GENRES = MUSIC_GENRES_DATA.map(g => ({
-    id: g.id,
-    name: g.id === "none" ? (language === "de" ? g.name_de : g.name_en) : g.name,
-    description: language === "de" ? g.desc_de : g.desc_en
-  }));
 
-  // Simulate progress during generation
   useEffect(() => {
     if (status === "generating_video") {
       const interval = setInterval(() => {
         setProgress(prev => {
-          if (prev >= 90) return prev;
-          return prev + Math.random() * 5;
+          if (prev >= 95) return prev;
+          return prev + Math.random() * 3;
         });
       }, 2000);
       return () => clearInterval(interval);
@@ -103,55 +66,17 @@ export default function AdGenerator() {
     }
   }, [status]);
 
-  const enhancePrompt = async () => {
-    if (!prompt.trim()) {
-      toast({
-        title: t("ads.prompt.missing"),
-        description: t("ads.prompt.missing.desc"),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsEnhancing(true);
-    setStatus("enhancing_prompt");
-
-    try {
-      const { data, error } = await supabase.functions.invoke('enhance-video-prompt', {
-        body: {
-          prompt: prompt.trim()
-        }
-      });
-
-      if (error) throw error;
-
-      setEnhancedPrompt(data.enhancedPrompt || data.prompt);
-      setStatus("draft");
-
-      toast({
-        title: t("ads.prompt.enhanced"),
-        description: t("ads.prompt.enhanced.desc")
-      });
-
-    } catch (error) {
-      console.error('Error enhancing prompt:', error);
-      // Fallback: create a basic enhancement locally
-      const enhanced = `Cinematic shot: ${prompt}. High quality, 4K resolution, professional lighting, smooth camera movement, vibrant colors, detailed textures.`;
-      setEnhancedPrompt(enhanced);
-      setStatus("draft");
-      
-      toast({
-        title: t("ads.prompt.enhanced.local"),
-        description: t("ads.prompt.enhanced.local.desc")
-      });
-    } finally {
-      setIsEnhancing(false);
-    }
-  };
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
 
   const generateVideo = async () => {
-    const finalPrompt = enhancedPrompt || prompt;
-    if (!finalPrompt.trim()) {
+    if (!prompt.trim()) {
       toast({
         title: t("ads.prompt.missing"),
         description: t("ads.prompt.missing.desc"),
@@ -176,7 +101,6 @@ export default function AdGenerator() {
     setProgress(0);
 
     try {
-      // Get avatar settings from localStorage
       const avatarId = localStorage.getItem("joggai_speaker1_avatar") || localStorage.getItem("joggai_selected_avatar") || "412";
       const voiceId = localStorage.getItem("joggai_speaker1_voice") || localStorage.getItem("joggai_selected_voice") || "MFZUKuGQUsGJPQjTS4wC";
       const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || localStorage.getItem("joggai_avatar_type") || "0");
@@ -189,7 +113,7 @@ export default function AdGenerator() {
         voice: {
           type: "script",
           voice_id: voiceId,
-          script: finalPrompt,
+          script: prompt.trim(),
         },
         aspect_ratio: "landscape",
         screen_style: 1,
@@ -213,59 +137,62 @@ export default function AdGenerator() {
         throw new Error(data.msg || "Video creation failed");
       }
 
-      const videoId = data.data.video_id;
+      const newVideoId = data.data.video_id;
+      setVideoId(newVideoId);
       
       toast({
         title: t("ads.status.generating"),
         description: t("ads.progress"),
       });
 
-      // Start polling for video status
-      pollVideoStatus(videoId, apiKey);
+      pollVideoStatus(newVideoId, apiKey);
 
     } catch (error) {
-      console.error('Error generating video:', error);
+      console.error("Error generating video:", error);
       toast({
         title: t("ads.video.error"),
         description: error instanceof Error ? error.message : t("ads.video.error.desc"),
         variant: "destructive"
       });
       setStatus("failed");
-    } finally {
       setIsGenerating(false);
     }
   };
 
-  const pollVideoStatus = async (videoId: string, apiKey: string) => {
+  const pollVideoStatus = (vid: string, apiKey: string) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
     const interval = setInterval(async () => {
       try {
         const { data, error: invokeErr } = await supabase.functions.invoke("joggai-proxy", {
-          body: { endpoint: `/avatar_video/${videoId}`, method: "GET", apiKey }
+          body: { endpoint: `/avatar_video/${vid}`, method: "GET", apiKey }
         });
         if (invokeErr) { console.error("Polling proxy error:", invokeErr); return; }
         console.log("JoggAI status check:", JSON.stringify(data));
 
         const statusRaw = data.data?.status;
-        const videoUrl = data.data?.video_url || data.data?.videoUrl;
+        const url = data.data?.video_url || data.data?.videoUrl;
+        const cover = data.data?.cover_url || data.data?.coverUrl;
 
-        // JoggAI returns "success" for completed videos, NOT "completed"
         const isCompleted = statusRaw === "success" || statusRaw === "completed" || statusRaw === 1;
         const isFailed = statusRaw === "failed" || statusRaw === "error" || statusRaw === -1;
 
-        if (isCompleted && videoUrl) {
+        if (isCompleted) {
           clearInterval(interval);
-          setRawVideoUrl(videoUrl);
-          setStatus("adding_captions");
+          pollingRef.current = null;
+          if (url) setVideoUrl(url);
+          if (cover) setCoverUrl(cover);
+          setStatus("completed");
           setIsGenerating(false);
           toast({
             title: t("ads.video.generated"),
             description: t("ads.video.generated.desc")
           });
-        } else if (isCompleted && !videoUrl) {
-          // Video completed but URL not yet available - keep polling a bit
-          console.log("Video completed but no URL yet, continuing to poll...");
         } else if (isFailed) {
           clearInterval(interval);
+          pollingRef.current = null;
           setStatus("failed");
           setIsGenerating(false);
           toast({
@@ -276,130 +203,40 @@ export default function AdGenerator() {
       } catch (error) {
         console.error("Polling error:", error);
       }
-    }, 10000);
+    }, 8000);
+
+    pollingRef.current = interval;
   };
 
-  const addCaptionsAndMusic = async () => {
-    if (!rawVideoUrl) {
-      toast({
-        title: t("ads.no.video"),
-        description: t("ads.no.video.desc"),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setStatus("adding_captions");
-    setIsGenerating(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('add-captions-music', {
-        body: {
-          videoUrl: rawVideoUrl,
-          captionText: captionText,
-          captionStyle: selectedCaptionStyle,
-          musicGenre: selectedMusicGenre
-        }
-      });
-
-      if (error) throw error;
-
-      setCaptionedVideoUrl(data.videoUrl || rawVideoUrl);
-      setStatus("completed");
-
-      toast({
-        title: t("ads.video.ready"),
-        description: t("ads.video.ready.desc")
-      });
-
-    } catch (error) {
-      console.error('Error adding captions:', error);
-      // Fallback: use raw video
-      setCaptionedVideoUrl(rawVideoUrl);
-      setStatus("completed");
-      toast({
-        title: t("ads.video.ready.fallback"),
-        description: t("ads.video.ready.fallback.desc")
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const saveToGoogleDrive = async () => {
-    const videoUrl = captionedVideoUrl || rawVideoUrl;
-    if (!videoUrl) {
-      toast({
-        title: t("ads.no.video"),
-        description: t("ads.no.video.desc"),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsSavingToDrive(true);
-    setStatus("uploading_drive");
-
-    try {
-      const { data, error } = await supabase.functions.invoke('save-to-drive', {
-        body: {
-          videoUrl: videoUrl,
-          folderId: googleDriveFolderId,
-          fileName: `ad-video-${new Date().toISOString().split('T')[0]}.mp4`
-        }
-      });
-
-      if (error) throw error;
-
-      setDriveUrl(data.driveUrl || data.fileUrl);
-      setStatus("completed");
-
-      toast({
-        title: t("ads.drive.saved"),
-        description: t("ads.drive.saved.desc")
-      });
-
-    } catch (error) {
-      console.error('Error saving to drive:', error);
-      toast({
-        title: t("ads.drive.error"),
-        description: t("ads.drive.error.desc"),
-        variant: "destructive"
-      });
-      setStatus("completed");
-    } finally {
-      setIsSavingToDrive(false);
-    }
-  };
+  const editorUrl = videoId ? `https://app.jogg.ai/editor?id=${videoId}&index=0&from=projects` : "";
 
   const downloadVideo = () => {
-    const videoUrl = captionedVideoUrl || rawVideoUrl;
     if (videoUrl) {
       const a = document.createElement("a");
       a.href = videoUrl;
-      a.download = `ad-video-${new Date().toISOString().split('T')[0]}.mp4`;
+      a.download = `ad-video-${new Date().toISOString().split("T")[0]}.mp4`;
       a.click();
     }
   };
 
   const resetProject = () => {
     setPrompt("");
-    setEnhancedPrompt("");
     setStatus("draft");
     setProgress(0);
-    setRawVideoUrl("");
-    setCaptionedVideoUrl("");
-    setCaptionText("");
-    setDriveUrl("");
+    setVideoId("");
+    setVideoUrl("");
+    setCoverUrl("");
+    setIsGenerating(false);
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
   };
 
   const getStatusLabel = () => {
     switch (status) {
       case "draft": return t("ads.status.draft");
-      case "enhancing_prompt": return t("ads.status.enhancing");
       case "generating_video": return t("ads.status.generating");
-      case "adding_captions": return t("ads.status.captions");
-      case "uploading_drive": return t("ads.status.uploading");
       case "completed": return t("ads.status.completed");
       case "failed": return t("ads.status.failed");
       default: return status;
@@ -408,7 +245,6 @@ export default function AdGenerator() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -441,18 +277,14 @@ export default function AdGenerator() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Input & Controls */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Step 1: Video Prompt */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
                   {t("ads.step1.title")}
                 </CardTitle>
-                <CardDescription>
-                  {t("ads.step1.desc")}
-                </CardDescription>
+                <CardDescription>{t("ads.step1.desc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
@@ -462,7 +294,6 @@ export default function AdGenerator() {
                   className="min-h-[100px]"
                   disabled={status !== "draft"}
                 />
-
                 <div className="flex flex-wrap gap-2">
                   {EXAMPLE_PROMPTS.map((example, i) => (
                     <Button
@@ -477,37 +308,9 @@ export default function AdGenerator() {
                     </Button>
                   ))}
                 </div>
-
-                <Button 
-                  onClick={enhancePrompt} 
-                  disabled={isEnhancing || !prompt.trim() || status !== "draft"}
-                  className="gap-2"
-                >
-                  {isEnhancing ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Wand2 className="w-4 h-4" />
-                  )}
-                  {t("ads.enhance")}
-                </Button>
-
-                {enhancedPrompt && (
-                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-4 h-4 text-primary" />
-                      <span className="font-medium text-sm">{t("ads.enhanced")}</span>
-                    </div>
-                    <Textarea
-                      value={enhancedPrompt}
-                      onChange={(e) => setEnhancedPrompt(e.target.value)}
-                      className="min-h-[80px] bg-background"
-                    />
-                  </div>
-                )}
-
                 <Button
                   onClick={generateVideo}
-                  disabled={isGenerating || (!prompt.trim() && !enhancedPrompt.trim()) || status === "generating_video"}
+                  disabled={isGenerating || !prompt.trim() || status === "generating_video"}
                   className="w-full gap-2"
                   size="lg"
                 >
@@ -523,215 +326,104 @@ export default function AdGenerator() {
                     </>
                   )}
                 </Button>
-
                 {status === "generating_video" && (
                   <div className="space-y-2">
                     <Progress value={progress} className="h-2" />
-                    <p className="text-xs text-muted-foreground text-center">
-                      {t("ads.progress")}
-                    </p>
+                    <p className="text-xs text-muted-foreground text-center">{t("ads.progress")}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Step 2: Captions & Music */}
-            {(rawVideoUrl || status === "adding_captions" || status === "completed") && (
-              <Card>
+            {status === "completed" && videoId && (
+              <Card className="border-green-500/30 bg-green-500/5">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
-                    {t("ads.step2.title")}
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    {language === "de" ? "Video fertig!" : "Video Ready!"}
                   </CardTitle>
                   <CardDescription>
-                    {t("ads.step2.desc")}
+                    {language === "de" 
+                      ? "Dein Video wurde erfolgreich generiert. Bearbeite es im JoggAI Editor oder lade es direkt herunter."
+                      : "Your video has been successfully generated. Edit it in the JoggAI Editor or download it directly."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Type className="w-4 h-4" />
-                      {t("ads.captions.text")}
-                    </Label>
-                    <Textarea
-                      placeholder={t("ads.captions.placeholder")}
-                      value={captionText}
-                      onChange={(e) => setCaptionText(e.target.value)}
-                      className="min-h-[60px]"
-                    />
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>{t("ads.captions.style")}</Label>
-                      <Select value={selectedCaptionStyle} onValueChange={setSelectedCaptionStyle}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CAPTION_STYLES.map(style => (
-                            <SelectItem key={style.id} value={style.id}>
-                              {style.name} - {language === "de" ? style.preview_de : style.preview_en}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Music className="w-4 h-4" />
-                        {t("ads.music")}
-                      </Label>
-                      <Select value={selectedMusicGenre} onValueChange={setSelectedMusicGenre}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MUSIC_GENRES.map(genre => (
-                            <SelectItem key={genre.id} value={genre.id}>
-                              {genre.name} - {genre.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
                   <Button
-                    onClick={addCaptionsAndMusic}
-                    disabled={isGenerating || !rawVideoUrl}
                     className="w-full gap-2"
+                    size="lg"
+                    onClick={() => window.open(editorUrl, "_blank")}
                   >
-                    {isGenerating && status === "adding_captions" ? (
+                    <Pencil className="w-4 h-4" />
+                    {language === "de" ? "Im JoggAI Editor bearbeiten" : "Edit in JoggAI Editor"}
+                    <ExternalLink className="w-4 h-4 ml-1" />
+                  </Button>
+                  <div className="flex gap-2">
+                    {videoUrl && (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {t("ads.captions.processing")}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        {t("ads.captions.apply")}
+                        <Button
+                          variant="outline"
+                          className="flex-1 gap-2"
+                          onClick={() => window.open(videoUrl, "_blank")}
+                        >
+                          <Play className="w-4 h-4" />
+                          {language === "de" ? "Video ansehen" : "Watch Video"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 gap-2"
+                          onClick={downloadVideo}
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </Button>
                       </>
                     )}
-                  </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center break-all">Video ID: {videoId}</p>
                 </CardContent>
               </Card>
             )}
 
-            {/* Step 3: Save to Drive */}
-            {(captionedVideoUrl || (rawVideoUrl && status === "completed")) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">3</span>
-                    {t("ads.step3.title")}
-                  </CardTitle>
-                  <CardDescription>
-                    {t("ads.step3.desc")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <FolderOpen className="w-4 h-4" />
-                      {t("ads.drive.folder")}
-                    </Label>
-                    <Input
-                      placeholder={t("ads.drive.folder.placeholder")}
-                      value={googleDriveFolderId}
-                      onChange={(e) => setGoogleDriveFolderId(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {t("ads.drive.folder.hint")}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={saveToGoogleDrive}
-                      disabled={isSavingToDrive}
-                      className="flex-1 gap-2"
-                    >
-                      {isSavingToDrive ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          {t("ads.drive.saving")}
-                        </>
-                      ) : (
-                        <>
-                          <FolderOpen className="w-4 h-4" />
-                          {t("ads.drive.save")}
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={downloadVideo}
-                      className="gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      {t("ads.download")}
-                    </Button>
-                  </div>
-
-                  {driveUrl && (
-                    <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      <span className="text-sm">{t("ads.drive.saved.badge")}</span>
-                      <a 
-                        href={driveUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline flex items-center gap-1 ml-auto"
-                      >
-                        {t("ads.drive.open")}
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  )}
+            {status === "failed" && (
+              <Card className="border-red-500/30 bg-red-500/5">
+                <CardContent className="pt-6 space-y-4">
+                  <p className="text-sm text-red-500">
+                    {language === "de" 
+                      ? "Video-Generierung fehlgeschlagen. Bitte versuche es erneut." 
+                      : "Video generation failed. Please try again."}
+                  </p>
+                  <Button onClick={resetProject} className="w-full">{t("ads.restart")}</Button>
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {/* Right Column - Preview */}
           <div className="space-y-6">
             <Card className="sticky top-24">
               <CardHeader>
                 <CardTitle className="text-base">{t("ads.preview")}</CardTitle>
               </CardHeader>
               <CardContent>
-                {(captionedVideoUrl || rawVideoUrl) ? (
+                {videoUrl ? (
                   <div className="space-y-4">
                     <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                      <video
-                        src={captionedVideoUrl || rawVideoUrl}
-                        controls
-                        className="w-full h-full"
-                        poster={`${captionedVideoUrl || rawVideoUrl}?thumb=true`}
-                      />
+                      <video src={videoUrl} controls className="w-full h-full" poster={coverUrl || undefined} />
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-1"
-                        onClick={() => window.open(captionedVideoUrl || rawVideoUrl, "_blank")}
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        {t("ads.fullscreen")}
+                      <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => window.open(editorUrl, "_blank")}>
+                        <Pencil className="w-3 h-3" />
+                        Editor
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-1"
-                        onClick={downloadVideo}
-                      >
+                      <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={downloadVideo}>
                         <Download className="w-3 h-3" />
                         Download
                       </Button>
                     </div>
+                  </div>
+                ) : coverUrl ? (
+                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                    <img src={coverUrl} alt="Video cover" className="w-full h-full object-cover" />
                   </div>
                 ) : (
                   <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
@@ -745,7 +437,6 @@ export default function AdGenerator() {
               </CardContent>
             </Card>
 
-            {/* Workflow Progress */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">{t("ads.workflow")}</CardTitle>
@@ -753,18 +444,15 @@ export default function AdGenerator() {
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { key: "draft", label: t("ads.workflow.describe"), icon: Type },
-                    { key: "enhancing_prompt", label: t("ads.workflow.enhance"), icon: Wand2 },
-                    { key: "generating_video", label: t("ads.workflow.generate"), icon: Video },
-                    { key: "adding_captions", label: t("ads.workflow.captions"), icon: Music },
-                    { key: "uploading_drive", label: t("ads.workflow.drive"), icon: FolderOpen },
-                    { key: "completed", label: t("ads.workflow.done"), icon: CheckCircle2 }
-                  ].map((step, index) => {
+                    { key: "draft", label: language === "de" ? "Prompt eingeben" : "Enter Prompt", icon: Type },
+                    { key: "generating_video", label: language === "de" ? "Video generieren" : "Generate Video", icon: Video },
+                    { key: "completed", label: language === "de" ? "Bearbeiten & Herunterladen" : "Edit & Download", icon: CheckCircle2 }
+                  ].map((step) => {
                     const Icon = step.icon;
-                    const statusOrder = ["draft", "enhancing_prompt", "generating_video", "adding_captions", "uploading_drive", "completed"];
-                    const currentIndex = statusOrder.indexOf(status);
-                    const stepIndex = statusOrder.indexOf(step.key);
-                    const isActive = step.key === status;
+                    const statusOrder: AdStatus[] = ["draft", "generating_video", "completed"];
+                    const currentIndex = statusOrder.indexOf(status === "failed" ? "draft" : status);
+                    const stepIndex = statusOrder.indexOf(step.key as AdStatus);
+                    const isActive = step.key === status || (step.key === "draft" && status === "failed");
                     const isCompleted = stepIndex < currentIndex;
                     
                     return (
@@ -781,7 +469,7 @@ export default function AdGenerator() {
                         }`}>
                           {isCompleted ? (
                             <CheckCircle2 className="w-4 h-4" />
-                          ) : isActive && status !== "completed" ? (
+                          ) : isActive && status === "generating_video" ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : (
                             <Icon className="w-3 h-3" />
