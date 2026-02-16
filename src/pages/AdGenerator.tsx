@@ -20,14 +20,18 @@ import {
   Megaphone,
   Sparkles,
   Camera,
-  Wand2
+  Wand2,
+  Volume2,
+  ImageIcon,
+  ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
-import AvatarVoicePicker from "@/components/podcast/AvatarVoicePicker";
+import AvatarVoiceModal from "@/components/podcast/AvatarVoiceModal";
+import type { AvatarVoiceSelection } from "@/components/podcast/AvatarVoiceModal";
 import { joggAiService } from "@/lib/joggai";
 import type { JoggAiTemplate } from "@/lib/joggai";
 import { cn } from "@/lib/utils";
@@ -94,15 +98,46 @@ export default function AdGenerator() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
+
+  // Avatar/Voice modal state
+  const [avModalOpen, setAvModalOpen] = useState(false);
+  const [avModalTab, setAvModalTab] = useState<"avatar" | "voice">("avatar");
+  const [selectedAvatarName, setSelectedAvatarName] = useState<string>("");
+  const [selectedAvatarImage, setSelectedAvatarImage] = useState<string>("");
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>("");
   
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const EXAMPLE_PROMPTS = language === "de" ? EXAMPLE_PROMPTS_DE : EXAMPLE_PROMPTS_EN;
 
-  // Load templates on mount
+  // Load templates on mount + restore saved avatar/voice names
   useEffect(() => {
     loadTemplates();
+    // Restore saved selection labels from localStorage
+    const savedAvatarId = localStorage.getItem("joggai_speaker1_avatar");
+    const savedVoiceId = localStorage.getItem("joggai_speaker1_voice");
+    if (savedAvatarId) setSelectedAvatarName(localStorage.getItem("joggai_speaker1_avatar_name") || "");
+    if (savedAvatarId) setSelectedAvatarImage(localStorage.getItem("joggai_speaker1_avatar_image") || "");
+    if (savedVoiceId) setSelectedVoiceName(localStorage.getItem("joggai_speaker1_voice_name") || "");
   }, []);
+
+  const openAvatarModal = () => {
+    setAvModalTab("avatar");
+    setAvModalOpen(true);
+  };
+  const openVoiceModal = () => {
+    setAvModalTab("voice");
+    setAvModalOpen(true);
+  };
+  const handleAvSelection = (selection: AvatarVoiceSelection) => {
+    setSelectedAvatarName(selection.avatarName || "");
+    setSelectedAvatarImage(selection.avatarImage || "");
+    setSelectedVoiceName(selection.voiceName || "");
+    // Also persist labels for restoring on reload
+    localStorage.setItem("joggai_speaker1_avatar_name", selection.avatarName || "");
+    localStorage.setItem("joggai_speaker1_avatar_image", selection.avatarImage || "");
+    localStorage.setItem("joggai_speaker1_voice_name", selection.voiceName || "");
+  };
 
   // Clear selected template when switching ad type
   useEffect(() => {
@@ -604,8 +639,98 @@ export default function AdGenerator() {
 
             {/* Avatar & Voice Selection (Custom mode only) */}
             {adType === "custom" && (
-              <AvatarVoicePicker storagePrefix="joggai_speaker1" />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
+                    <User className="w-4 h-4" />
+                    {language === "de" ? "Avatar & Stimme" : "Avatar & Voice"}
+                  </CardTitle>
+                  <CardDescription>
+                    {language === "de"
+                      ? "Klicke auf ein Feld, um Avatare oder Stimmen zu durchstöbern"
+                      : "Click a field to browse avatars or voices"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Avatar selection field */}
+                  <button
+                    onClick={openAvatarModal}
+                    disabled={status !== "draft"}
+                    className={cn(
+                      "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
+                      selectedAvatarName
+                        ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                        : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
+                      status !== "draft" && "opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-14 h-14 rounded-xl flex-shrink-0 overflow-hidden",
+                      selectedAvatarImage ? "" : "bg-muted flex items-center justify-center"
+                    )}>
+                      {selectedAvatarImage ? (
+                        <img src={selectedAvatarImage} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">
+                        {selectedAvatarName || (language === "de" ? "Kein Avatar ausgewählt" : "No avatar selected")}
+                      </p>
+                      <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
+                        {language === "de" ? "Optionen anzeigen" : "View options"} →
+                      </p>
+                    </div>
+                    {selectedAvatarName ? (
+                      <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                    )}
+                  </button>
+
+                  {/* Voice selection field */}
+                  <button
+                    onClick={openVoiceModal}
+                    disabled={status !== "draft"}
+                    className={cn(
+                      "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
+                      selectedVoiceName
+                        ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                        : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
+                      status !== "draft" && "opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                      <Volume2 className={cn("w-6 h-6", selectedVoiceName ? "text-primary" : "text-muted-foreground")} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">
+                        {selectedVoiceName || (language === "de" ? "Keine Stimme ausgewählt" : "No voice selected")}
+                      </p>
+                      <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
+                        {language === "de" ? "Optionen anzeigen" : "View options"} →
+                      </p>
+                    </div>
+                    {selectedVoiceName ? (
+                      <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                    )}
+                  </button>
+                </CardContent>
+              </Card>
             )}
+
+            {/* Avatar/Voice Browser Modal */}
+            <AvatarVoiceModal
+              open={avModalOpen}
+              onOpenChange={setAvModalOpen}
+              initialTab={avModalTab}
+              storagePrefix="joggai_speaker1"
+              onConfirm={handleAvSelection}
+            />
 
             {/* Step: Prompt / Script */}
             <Card>
