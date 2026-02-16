@@ -38,6 +38,7 @@ export default function PodcastCreator() {
   const [dialogue, setDialogue] = useState<DialogueLine[]>([]);
   const [speaker1Name, setSpeaker1Name] = useState("Alex");
   const [speaker2Name, setSpeaker2Name] = useState("Sam");
+  const [podcastTitle, setPodcastTitle] = useState("");
   const [speaker1Config, setSpeaker1Config] = useState<PodcastSpeakerConfig | null>(null);
   const [speaker2Config, setSpeaker2Config] = useState<PodcastSpeakerConfig | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
@@ -135,33 +136,67 @@ export default function PodcastCreator() {
 
   const parseScriptToDialogue = (script: string): DialogueLine[] => {
     const lines: DialogueLine[] = [];
-    const regex = /\*\*([^*]+)\*\*:\s*(.+?)(?=\n\*\*|\n\n|$)/gs;
-    let match;
+    const scriptLines = script.split('\n').filter(l => l.trim());
 
-    while ((match = regex.exec(script)) !== null) {
-      const speakerName = match[1].trim();
-      const text = match[2].trim();
-      
-      const speaker = speakerName.toLowerCase() === speaker1Name.toLowerCase() 
-        ? "speaker1" 
-        : "speaker2";
-
-      lines.push({
-        id: crypto.randomUUID(),
-        speaker,
-        text
-      });
+    // New format: first line is title, then a:/b: dialogue lines
+    let startIndex = 0;
+    if (scriptLines.length > 0 && !scriptLines[0].match(/^[ab]:/i)) {
+      // First non-empty line is the title — store it
+      const title = scriptLines[0].replace(/^#+\s*/, '').trim();
+      setPodcastTitle(title);
+      startIndex = 1;
     }
 
-    // If no matches, try simple line-by-line parsing
+    // Parse a:/b: lines
+    for (let i = startIndex; i < scriptLines.length; i++) {
+      const line = scriptLines[i].trim();
+      const abMatch = line.match(/^([ab]):\s*(.+)/i);
+      if (abMatch) {
+        const speaker = abMatch[1].toLowerCase() === 'a' ? 'speaker1' : 'speaker2';
+        const text = abMatch[2].trim();
+        if (text) {
+          lines.push({ id: crypto.randomUUID(), speaker, text });
+        }
+        continue;
+      }
+
+      // Fallback: try **SpeakerName**: format (legacy)
+      const boldMatch = line.match(/^\*\*([^*]+)\*\*:\s*(.+)/);
+      if (boldMatch) {
+        const speakerName = boldMatch[1].trim();
+        const text = boldMatch[2].trim();
+        const speaker = speakerName.toLowerCase() === speaker1Name.toLowerCase()
+          ? 'speaker1'
+          : 'speaker2';
+        if (text) {
+          lines.push({ id: crypto.randomUUID(), speaker, text });
+        }
+        continue;
+      }
+
+      // Fallback: SpeakerName: format
+      const colonMatch = line.match(/^([^:]+):\s*(.+)/);
+      if (colonMatch && colonMatch[2].trim()) {
+        const speakerName = colonMatch[1].trim();
+        const text = colonMatch[2].trim();
+        const speaker = speakerName.toLowerCase() === speaker1Name.toLowerCase()
+          ? 'speaker1'
+          : 'speaker2';
+        lines.push({ id: crypto.randomUUID(), speaker, text });
+      }
+    }
+
+    // Last resort: just alternate lines
     if (lines.length === 0) {
-      const simpleLines = script.split('\n').filter(l => l.trim());
-      simpleLines.forEach((line, index) => {
-        lines.push({
-          id: crypto.randomUUID(),
-          speaker: index % 2 === 0 ? "speaker1" : "speaker2",
-          text: line.replace(/^[^:]+:\s*/, '').trim()
-        });
+      scriptLines.forEach((line, index) => {
+        const text = line.replace(/^[^:]+:\s*/, '').trim();
+        if (text) {
+          lines.push({
+            id: crypto.randomUUID(),
+            speaker: index % 2 === 0 ? 'speaker1' : 'speaker2',
+            text
+          });
+        }
       });
     }
 
@@ -279,10 +314,12 @@ export default function PodcastCreator() {
   };
 
   const handleExport = () => {
-    const content = dialogue.map(line => {
-      const speakerName = line.speaker === "speaker1" ? speaker1Name : speaker2Name;
-      return `${speakerName}: ${line.text}`;
-    }).join('\n\n');
+    const title = podcastTitle || topic || 'Podcast';
+    const dialogueContent = dialogue.map(line => {
+      const label = line.speaker === "speaker1" ? "a" : "b";
+      return `${label}: ${line.text}`;
+    }).join('\n');
+    const content = `${title}\n\n${dialogueContent}`;
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);

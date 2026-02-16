@@ -45,20 +45,32 @@ serve(async (req) => {
     const systemPrompt = `Du bist ein erfahrener Podcast-Skriptautor. Erstelle einen natürlichen, engagierten Dialog zwischen zwei Sprechern.
 
 ## SPRECHER
-- ${speakerNames[0]}: Der Hauptmoderator
-- ${speakerNames[1]}: Der Co-Moderator/Gast
+- a: ${speakerNames[0]} (Der Hauptmoderator)
+- b: ${speakerNames[1]} (Der Co-Moderator/Gast)
 
 ## STIL
 - ${style === "conversational" ? "Locker und gesprächig, wie unter Freunden" : 
      style === "professional" ? "Professionell aber zugänglich" : 
      "Informativ und sachlich"}
 
+## FORMAT
+Die erste Zeile ist der Titel des Podcasts (kurz und prägnant, ohne Präfix).
+Danach folgt eine Leerzeile.
+Jede Dialogzeile beginnt mit "a:" oder "b:" gefolgt vom gesprochenen Text.
+
+Beispiel:
+Die Zukunft der KI
+
+a: Willkommen zum Podcast! Heute sprechen wir über...
+b: Ja, das ist ein spannendes Thema...
+a: Absolut! Lass uns direkt einsteigen...
+
 ## REGELN
 - Schreibe einen Dialog für ca. ${durationMinutes} Minuten (${wordCount} Wörter)
-- Formatiere jeden Beitrag als: **Sprechername**: Text
 - Wechsel regelmäßig zwischen den Sprechern
 - Füge natürliche Reaktionen ein (Hmm, Ja genau, Interessant...)
 - Keine Regieanweisungen, nur gesprochener Text
+- Halte dich STRIKT an das Format: Titel, Leerzeile, dann a:/b: Zeilen
 
 Erstelle den Dialog jetzt.`;
 
