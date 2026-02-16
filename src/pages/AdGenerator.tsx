@@ -19,7 +19,8 @@ import {
   LayoutTemplate,
   Megaphone,
   Sparkles,
-  Camera
+  Camera,
+  Wand2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +93,7 @@ export default function AdGenerator() {
   const [promoTemplates, setPromoTemplates] = useState<JoggAiTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
   
   const { toast } = useToast();
   const { t, language } = useLanguage();
@@ -146,6 +148,40 @@ export default function AdGenerator() {
       console.warn("Could not load templates:", error);
     } finally {
       setLoadingTemplates(false);
+    }
+  };
+
+  const improveMonologue = async () => {
+    if (!prompt.trim()) return;
+    setIsImproving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('optimize-podcast-script', {
+        body: {
+          script: prompt.trim(),
+          instruction: language === "de"
+            ? "Verbessere diesen Monolog: Mache ihn natürlicher, überzeugender und professioneller. Behalte die Kernaussage bei, aber optimiere Formulierung, Rhythmus und Wirkung. Gib nur den verbesserten Text zurück, ohne Erklärungen."
+            : "Improve this monologue: Make it more natural, compelling and professional. Keep the core message but optimize wording, rhythm and impact. Return only the improved text, without explanations.",
+          type: "edit"
+        }
+      });
+      if (error) throw error;
+      const improved = data.optimizedScript || data.script;
+      if (improved) {
+        setPrompt(improved);
+        toast({
+          title: t("ads.improved"),
+          description: t("ads.improved.desc"),
+        });
+      }
+    } catch (error) {
+      console.error("Error improving monologue:", error);
+      toast({
+        title: t("common.error"),
+        description: error instanceof Error ? error.message : "Could not improve monologue",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImproving(false);
     }
   };
 
@@ -575,7 +611,7 @@ export default function AdGenerator() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
+                  <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">{isTemplateMode ? "2" : "2"}</span>
                   {isTemplateMode
                     ? (language === "de" ? "Skript / Produktbeschreibung" : "Script / Product Description")
                     : t("ads.step1.title")}
@@ -594,7 +630,9 @@ export default function AdGenerator() {
                     ? (language === "de" 
                         ? "z.B. Unser neues Produkt revolutioniert die Art und Weise, wie Sie arbeiten..."
                         : "e.g. Our new product revolutionizes the way you work...")
-                    : t("ads.placeholder")}
+                    : (language === "de"
+                        ? "z.B. Hallo! Heute möchte ich euch etwas Spannendes zeigen..."
+                        : "e.g. Hey everyone! Today I want to show you something exciting...")}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   className="min-h-[100px]"
@@ -615,6 +653,29 @@ export default function AdGenerator() {
                       </Button>
                     ))}
                   </div>
+                )}
+
+                {/* Improve Monologue button */}
+                {prompt.trim().length > 10 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={improveMonologue}
+                    disabled={isImproving || status !== "draft"}
+                    className="gap-2 w-full sm:w-auto"
+                  >
+                    {isImproving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {t("ads.improving")}
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4" />
+                        {t("ads.improve")}
+                      </>
+                    )}
+                  </Button>
                 )}
 
                 {isTemplateMode && selectedTemplateId && (
