@@ -29,10 +29,11 @@ export interface TavusVideo {
 // ---------- Config ----------
 
 const TAVUS_API_KEY = "ae960a31e95f4bc895a2f6e9fff1790e";
+const TAVUS_BASE_URL = "https://tavusapi.com/v2";
 
 async function tavusRequest<T>(endpoint: string, method: "GET" | "POST" | "DELETE" = "GET", payload?: unknown): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("tavus-proxy", {
-    body: { endpoint, method, payload, apiKey: TAVUS_API_KEY },
+  const { data, error } = await supabase.functions.invoke("joggai-proxy", {
+    body: { endpoint, method, payload, apiKey: TAVUS_API_KEY, baseUrl: TAVUS_BASE_URL },
   });
   if (error) throw new Error(error.message || "Tavus proxy error");
   if (data?.error) throw new Error(data.error);

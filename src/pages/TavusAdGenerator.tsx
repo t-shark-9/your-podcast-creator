@@ -140,8 +140,8 @@ export default function TavusAdGenerator() {
         toast({ title: language === "de" ? "Nur Videos" : "Videos only", description: language === "de" ? "Bitte wähle eine Videodatei" : "Please select a video file", variant: "destructive" });
         return;
       }
-      if (file.size > 750 * 1024 * 1024) {
-        toast({ title: language === "de" ? "Datei zu groß" : "File too large", description: language === "de" ? "Max. 750 MB" : "Max 750 MB", variant: "destructive" });
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: language === "de" ? "Datei zu groß" : "File too large", description: language === "de" ? "Max 5 MB. Für größere Videos nutze eine URL." : "Max 5 MB. Use a URL for larger videos.", variant: "destructive" });
         return;
       }
       setSelectedFile(file);
@@ -153,8 +153,8 @@ export default function TavusAdGenerator() {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("video/")) {
-      if (file.size > 750 * 1024 * 1024) {
-        toast({ title: language === "de" ? "Datei zu groß" : "File too large", description: "Max 750 MB", variant: "destructive" });
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: language === "de" ? "Datei zu groß" : "File too large", description: language === "de" ? "Max 5 MB. Für größere Videos nutze eine URL." : "Max 5 MB. Use a URL for larger videos.", variant: "destructive" });
         return;
       }
       setSelectedFile(file);
@@ -990,7 +990,7 @@ export default function TavusAdGenerator() {
                     <p className="text-sm font-medium">
                       {language === "de" ? "Video hierher ziehen oder klicken" : "Drag video here or click to browse"}
                     </p>
-                    <p className="text-xs text-muted-foreground">MP4 / WebM, max 750 MB</p>
+                    <p className="text-xs text-muted-foreground">MP4 / WebM, max 5 MB (use URL for larger)</p>
                   </div>
                 )}
               </div>
