@@ -27,8 +27,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
-import AvatarVoiceModal from "@/components/podcast/AvatarVoiceModal";
-import type { AvatarVoiceSelection } from "@/components/podcast/AvatarVoiceModal";
+import AvatarBrowserModal from "@/components/podcast/AvatarBrowserModal";
+import type { AvatarSelection } from "@/components/podcast/AvatarBrowserModal";
+import VoiceBrowserModal from "@/components/podcast/VoiceBrowserModal";
+import type { VoiceSelection } from "@/components/podcast/VoiceBrowserModal";
 import TemplateBrowserModal from "@/components/podcast/TemplateBrowserModal";
 import { joggAiService } from "@/lib/joggai";
 import type { JoggAiTemplate } from "@/lib/joggai";
@@ -48,11 +50,16 @@ export default function AdGenerator() {
   const [isImproving, setIsImproving] = useState(false);
   const [isTemplateVideo, setIsTemplateVideo] = useState(false);
 
-  // Avatar/Voice modal state
-  const [avModalOpen, setAvModalOpen] = useState(false);
-  const [avModalTab, setAvModalTab] = useState<"avatar" | "voice">("avatar");
+  // Generation mode: avatar+voice or template
+  const [genMode, setGenMode] = useState<"avatar" | "template">("avatar");
+
+  // Avatar modal state
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const [selectedAvatarName, setSelectedAvatarName] = useState("");
   const [selectedAvatarImage, setSelectedAvatarImage] = useState("");
+
+  // Voice modal state
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [selectedVoiceName, setSelectedVoiceName] = useState("");
 
   // Template modal state
@@ -80,6 +87,7 @@ export default function AdGenerator() {
       setSelectedTemplateId(savedTmplId);
       setSelectedTemplateName(localStorage.getItem("joggai_selected_template_name") || "");
       setSelectedTemplateCover(localStorage.getItem("joggai_selected_template_cover") || "");
+      setGenMode("template");
     }
   }, []);
 
@@ -104,16 +112,29 @@ export default function AdGenerator() {
   }, []);
 
   // ---- Modal handlers ----
-  const openAvatarModal = () => { setAvModalTab("avatar"); setAvModalOpen(true); };
-  const openVoiceModal = () => { setAvModalTab("voice"); setAvModalOpen(true); };
-
-  const handleAvSelection = (selection: AvatarVoiceSelection) => {
+  const handleAvatarSelection = (selection: AvatarSelection) => {
     setSelectedAvatarName(selection.avatarName || "");
     setSelectedAvatarImage(selection.avatarImage || "");
-    setSelectedVoiceName(selection.voiceName || "");
     localStorage.setItem("joggai_speaker1_avatar_name", selection.avatarName || "");
     localStorage.setItem("joggai_speaker1_avatar_image", selection.avatarImage || "");
+  };
+
+  const handleVoiceSelection = (selection: VoiceSelection) => {
+    setSelectedVoiceName(selection.voiceName || "");
     localStorage.setItem("joggai_speaker1_voice_name", selection.voiceName || "");
+  };
+
+  const switchMode = (mode: "avatar" | "template") => {
+    setGenMode(mode);
+    if (mode === "avatar") {
+      // Clear template selection
+      setSelectedTemplateId("");
+      setSelectedTemplateName("");
+      setSelectedTemplateCover("");
+      localStorage.removeItem("joggai_selected_template_id");
+      localStorage.removeItem("joggai_selected_template_name");
+      localStorage.removeItem("joggai_selected_template_cover");
+    }
   };
 
   const handleTemplateSelection = (template: JoggAiTemplate | null) => {
@@ -321,7 +342,9 @@ export default function AdGenerator() {
     }
   };
 
-  const configuredCount = [selectedAvatarName, selectedVoiceName, selectedTemplateId].filter(Boolean).length;
+  const configuredCount = genMode === "template"
+    ? (selectedTemplateId ? 1 : 0)
+    : [selectedAvatarName, selectedVoiceName].filter(Boolean).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -360,7 +383,7 @@ export default function AdGenerator() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
 
-            {/* Step 1: Avatar, Voice & Template selection */}
+            {/* Step 1: Configuration – Mode toggle + fields */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -369,126 +392,175 @@ export default function AdGenerator() {
                 </CardTitle>
                 <CardDescription>
                   {language === "de"
-                    ? "Klicke auf ein Feld um Avatare, Stimmen oder Templates zu durchst\u00F6bern"
-                    : "Click a field to browse avatars, voices or templates"}
+                    ? "Wähle entweder ein Template ODER einen Avatar + Stimme"
+                    : "Choose either a Template OR an Avatar + Voice"}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
 
-                {/* Avatar field */}
-                <button
-                  onClick={openAvatarModal}
-                  disabled={status !== "draft"}
-                  className={cn(
-                    "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
-                    selectedAvatarName
-                      ? "border-primary/30 bg-primary/5 hover:border-primary/50"
-                      : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
-                    status !== "draft" && "opacity-60 cursor-not-allowed"
-                  )}
-                >
-                  <div className={cn(
-                    "w-14 h-14 rounded-xl flex-shrink-0 overflow-hidden",
-                    selectedAvatarImage ? "" : "bg-muted flex items-center justify-center"
-                  )}>
-                    {selectedAvatarImage ? (
-                      <img src={selectedAvatarImage} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                {/* Mode toggle */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => switchMode("avatar")}
+                    disabled={status !== "draft"}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
+                      genMode === "avatar"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                        : "border-border/50 hover:border-primary/40 hover:bg-muted/30",
+                      status !== "draft" && "opacity-60 cursor-not-allowed"
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-0.5">Avatar</p>
-                    <p className="text-sm font-medium">
-                      {selectedAvatarName || (language === "de" ? "Kein Avatar ausgew\u00E4hlt" : "No avatar selected")}
-                    </p>
-                    <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
-                      {language === "de" ? "Optionen anzeigen" : "View options"} {"\u2192"}
-                    </p>
-                  </div>
-                  {selectedAvatarName ? (
-                    <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
-                  )}
-                </button>
+                  >
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center",
+                      genMode === "avatar" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    )}>
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{language === "de" ? "Avatar + Stimme" : "Avatar + Voice"}</p>
+                      <p className="text-xs text-muted-foreground">{language === "de" ? "Avatar spricht dein Skript" : "Avatar speaks your script"}</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => switchMode("template")}
+                    disabled={status !== "draft"}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
+                      genMode === "template"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                        : "border-border/50 hover:border-primary/40 hover:bg-muted/30",
+                      status !== "draft" && "opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center",
+                      genMode === "template" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    )}>
+                      <LayoutTemplate className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Template</p>
+                      <p className="text-xs text-muted-foreground">{language === "de" ? "Vorgefertigtes Videodesign" : "Pre-designed video layout"}</p>
+                    </div>
+                  </button>
+                </div>
 
-                {/* Voice field */}
-                <button
-                  onClick={openVoiceModal}
-                  disabled={status !== "draft"}
-                  className={cn(
-                    "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
-                    selectedVoiceName
-                      ? "border-primary/30 bg-primary/5 hover:border-primary/50"
-                      : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
-                    status !== "draft" && "opacity-60 cursor-not-allowed"
-                  )}
-                >
-                  <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                    <Volume2 className={cn("w-6 h-6", selectedVoiceName ? "text-primary" : "text-muted-foreground")} />
+                {/* Avatar + Voice fields */}
+                {genMode === "avatar" && (
+                  <div className="space-y-3">
+                    {/* Avatar field */}
+                    <button
+                      onClick={() => setAvatarModalOpen(true)}
+                      disabled={status !== "draft"}
+                      className={cn(
+                        "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
+                        selectedAvatarName
+                          ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                          : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
+                        status !== "draft" && "opacity-60 cursor-not-allowed"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-14 h-14 rounded-xl flex-shrink-0 overflow-hidden",
+                        selectedAvatarImage ? "" : "bg-muted flex items-center justify-center"
+                      )}>
+                        {selectedAvatarImage ? (
+                          <img src={selectedAvatarImage} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-0.5">Avatar</p>
+                        <p className="text-sm font-medium">
+                          {selectedAvatarName || (language === "de" ? "Kein Avatar ausgewählt" : "No avatar selected")}
+                        </p>
+                        <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
+                          {language === "de" ? "Optionen anzeigen" : "View options"} {"\u2192"}
+                        </p>
+                      </div>
+                      {selectedAvatarName ? (
+                        <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                      )}
+                    </button>
+
+                    {/* Voice field */}
+                    <button
+                      onClick={() => setVoiceModalOpen(true)}
+                      disabled={status !== "draft"}
+                      className={cn(
+                        "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
+                        selectedVoiceName
+                          ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                          : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
+                        status !== "draft" && "opacity-60 cursor-not-allowed"
+                      )}
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                        <Volume2 className={cn("w-6 h-6", selectedVoiceName ? "text-primary" : "text-muted-foreground")} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-0.5">
+                          {language === "de" ? "Stimme" : "Voice"}
+                        </p>
+                        <p className="text-sm font-medium">
+                          {selectedVoiceName || (language === "de" ? "Keine Stimme ausgewählt" : "No voice selected")}
+                        </p>
+                        <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
+                          {language === "de" ? "Optionen anzeigen" : "View options"} {"\u2192"}
+                        </p>
+                      </div>
+                      {selectedVoiceName ? (
+                        <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                      )}
+                    </button>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-0.5">
-                      {language === "de" ? "Stimme" : "Voice"}
-                    </p>
-                    <p className="text-sm font-medium">
-                      {selectedVoiceName || (language === "de" ? "Keine Stimme ausgew\u00E4hlt" : "No voice selected")}
-                    </p>
-                    <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
-                      {language === "de" ? "Optionen anzeigen" : "View options"} {"\u2192"}
-                    </p>
-                  </div>
-                  {selectedVoiceName ? (
-                    <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
-                  )}
-                </button>
+                )}
 
                 {/* Template field */}
-                <button
-                  onClick={() => setTemplateModalOpen(true)}
-                  disabled={status !== "draft"}
-                  className={cn(
-                    "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
-                    selectedTemplateId
-                      ? "border-primary/30 bg-primary/5 hover:border-primary/50"
-                      : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
-                    status !== "draft" && "opacity-60 cursor-not-allowed"
-                  )}
-                >
-                  <div className={cn(
-                    "w-14 h-14 rounded-xl flex-shrink-0 overflow-hidden",
-                    selectedTemplateCover ? "" : "bg-muted flex items-center justify-center"
-                  )}>
-                    {selectedTemplateCover ? (
-                      <img src={selectedTemplateCover} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <LayoutTemplate className="w-6 h-6 text-muted-foreground" />
+                {genMode === "template" && (
+                  <button
+                    onClick={() => setTemplateModalOpen(true)}
+                    disabled={status !== "draft"}
+                    className={cn(
+                      "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
+                      selectedTemplateId
+                        ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                        : "border-dashed border-border hover:border-primary/40 hover:bg-muted/30",
+                      status !== "draft" && "opacity-60 cursor-not-allowed"
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-0.5">Template</p>
-                    <p className="text-sm font-medium">
-                      {selectedTemplateName || (language === "de" ? "Kein Template ausgew\u00E4hlt" : "No template selected")}
-                    </p>
-                    <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
-                      {language === "de" ? "Optionen anzeigen" : "View options"} {"\u2192"}
-                    </p>
-                  </div>
-                  {selectedTemplateId ? (
-                    <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
-                  )}
-                </button>
-
-                <p className="text-xs text-muted-foreground text-center pt-1">
-                  {language === "de"
-                    ? "Template = template-basiertes Video. Ohne Template wird der Avatar direkt mit deinem Skript generiert."
-                    : "Template = template-based video. Without a template, the avatar speaks your script directly."}
-                </p>
+                  >
+                    <div className={cn(
+                      "w-14 h-14 rounded-xl flex-shrink-0 overflow-hidden",
+                      selectedTemplateCover ? "" : "bg-muted flex items-center justify-center"
+                    )}>
+                      {selectedTemplateCover ? (
+                        <img src={selectedTemplateCover} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <LayoutTemplate className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-0.5">Template</p>
+                      <p className="text-sm font-medium">
+                        {selectedTemplateName || (language === "de" ? "Kein Template ausgewählt" : "No template selected")}
+                      </p>
+                      <p className="text-xs text-primary font-medium mt-0.5 group-hover:underline">
+                        {language === "de" ? "Optionen anzeigen" : "View options"} {"\u2192"}
+                      </p>
+                    </div>
+                    {selectedTemplateId ? (
+                      <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors" />
+                    )}
+                  </button>
+                )}
               </CardContent>
             </Card>
 
@@ -497,12 +569,12 @@ export default function AdGenerator() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
-                  {selectedTemplateId
+                  {genMode === "template"
                     ? (language === "de" ? "Skript / Produktbeschreibung" : "Script / Product Description")
                     : t("ads.step1.title")}
                 </CardTitle>
                 <CardDescription>
-                  {selectedTemplateId
+                  {genMode === "template"
                     ? (language === "de"
                         ? "Beschreibe dein Produkt oder schreibe das Skript f\u00FCr das Video"
                         : "Describe your product or write the script for the video")
@@ -511,7 +583,7 @@ export default function AdGenerator() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder={selectedTemplateId
+                  placeholder={genMode === "template"
                     ? (language === "de"
                         ? "z.B. Unser neues Produkt revolutioniert die Art und Weise, wie Sie arbeiten..."
                         : "e.g. Our new product revolutionizes the way you work...")
@@ -540,7 +612,7 @@ export default function AdGenerator() {
                   </Button>
                 )}
 
-                {selectedTemplateId && (
+                {genMode === "template" && selectedTemplateId && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <LayoutTemplate className="w-3 h-3" />
                     {language === "de" ? "Generierung via Template" : "Template-based generation"}
@@ -672,7 +744,7 @@ export default function AdGenerator() {
                 <div className="space-y-3">
                   {(() => {
                     const steps = [
-                      { label: language === "de" ? "Avatar, Stimme & Template" : "Avatar, Voice & Template", icon: User },
+                      { label: language === "de" ? "Modus wählen" : "Choose Mode", icon: User },
                       { label: language === "de" ? "Skript eingeben" : "Enter Script", icon: Type },
                       { label: language === "de" ? "Video generieren" : "Generate Video", icon: Video },
                       { label: language === "de" ? "Bearbeiten & Herunterladen" : "Edit & Download", icon: CheckCircle2 },
@@ -721,12 +793,17 @@ export default function AdGenerator() {
       </main>
 
       {/* Modals */}
-      <AvatarVoiceModal
-        open={avModalOpen}
-        onOpenChange={setAvModalOpen}
-        initialTab={avModalTab}
+      <AvatarBrowserModal
+        open={avatarModalOpen}
+        onOpenChange={setAvatarModalOpen}
         storagePrefix="joggai_speaker1"
-        onConfirm={handleAvSelection}
+        onConfirm={handleAvatarSelection}
+      />
+      <VoiceBrowserModal
+        open={voiceModalOpen}
+        onOpenChange={setVoiceModalOpen}
+        storagePrefix="joggai_speaker1"
+        onConfirm={handleVoiceSelection}
       />
       <TemplateBrowserModal
         open={templateModalOpen}

@@ -219,7 +219,7 @@ export default function AvatarBrowserModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-4xl w-[95vw] h-[95vh] max-h-[95vh] flex flex-col p-0 gap-0">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b space-y-1.5">
           <DialogHeader>
