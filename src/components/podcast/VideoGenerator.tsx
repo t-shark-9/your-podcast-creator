@@ -147,7 +147,7 @@ export default function VideoGenerator({
   // Resume polling for persisted in-progress jobs
   useEffect(() => {
     if (videoJob && (videoJob.status === "processing" || videoJob.status === "pending") && !pollingRef.current) {
-      startPolling(videoJob.videoId);
+      startPolling(videoJob.videoId, generationMethod === "template");
     }
   }, []);
 
@@ -245,33 +245,19 @@ export default function VideoGenerator({
           // Also prepare per-speaker scripts
           const { speaker1Script, speaker2Script } = getSpeakerScripts();
 
-          // Template variables – try common variable names
-          const variables: Array<{ key: string; value: string }> = [
-            { key: "text_content", value: dialogueText },
-            { key: "script", value: dialogueText },
-            { key: "dialogue", value: dialogueText },
-            { key: "speaker_a_script", value: speaker1Script },
-            { key: "speaker_b_script", value: speaker2Script },
-            { key: "speaker_a_name", value: speaker1Name },
-            { key: "speaker_b_name", value: speaker2Name },
-            { key: "title", value: `${speaker1Name} & ${speaker2Name} Podcast` },
+          // Template variables – use JoggAI v2 format {type, name, properties}
+          const variables: Array<{ type: string; name: string; properties: { content?: string } }> = [
+            { type: "script", name: "script", properties: { content: dialogueText } },
           ];
-
-          // If speaker configs have avatar/voice info, include them
-          if (speaker1Config) {
-            variables.push({ key: "avatar_a", value: String(speaker1Config.avatarId) });
-            variables.push({ key: "voice_a", value: speaker1Config.voiceId });
-          }
-          if (speaker2Config) {
-            variables.push({ key: "avatar_b", value: String(speaker2Config.avatarId) });
-            variables.push({ key: "voice_b", value: speaker2Config.voiceId });
-          }
 
           const result = await joggAiService.createVideoFromTemplate({
             templateId: templateToUse.template_id,
             variables,
             videoName: `${speaker1Name} & ${speaker2Name} Podcast`,
-            aspectRatio: aspectRatio as "landscape" | "portrait" | "square",
+            avatarId: speaker1Config ? String(speaker1Config.avatarId) : undefined,
+            avatarType: speaker1Config?.avatarType,
+            voiceId: speaker1Config?.voiceId,
+            voiceLanguage: language === "de" ? "german" : "english",
           });
 
           setGenerationMethod("template");
@@ -285,7 +271,7 @@ export default function VideoGenerator({
             description: `Using template: ${templateToUse.name}`,
           });
 
-          startPolling(result.video_id);
+          startPolling(result.video_id, true);
           return; // Success – don't fall through to avatar method
         } catch (templateError) {
           console.warn("Template-based generation failed, falling back to avatar method:", templateError);
@@ -423,12 +409,13 @@ export default function VideoGenerator({
     }
   };
 
-  const checkVideoStatus = useCallback(async (videoId: string): Promise<VideoJob | null> => {
+  const checkVideoStatus = useCallback(async (videoId: string, useTemplateEndpoint = false): Promise<VideoJob | null> => {
     const pollApiKey = localStorage.getItem("joggai_api_key") || import.meta.env.VITE_JOGGAI_API_KEY || "";
+    const endpoint = useTemplateEndpoint ? `/template_video/${videoId}` : `/avatar_video/${videoId}`;
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("joggai-proxy", {
         body: {
-          endpoint: `/avatar_video/${videoId}`,
+          endpoint,
           method: "GET",
           apiKey: pollApiKey || undefined,
         },
@@ -465,7 +452,7 @@ export default function VideoGenerator({
     }
   }, []);
 
-  const startPolling = (videoId: string) => {
+  const startPolling = (videoId: string, useTemplateEndpoint = false) => {
     // Clear any existing interval
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -473,7 +460,7 @@ export default function VideoGenerator({
     }
 
     const interval = setInterval(async () => {
-      const result = await checkVideoStatus(videoId);
+      const result = await checkVideoStatus(videoId, useTemplateEndpoint);
       if (!result) return; // Transient error, keep polling
 
       setVideoJob(result);
@@ -501,7 +488,7 @@ export default function VideoGenerator({
 
   const handleManualRefresh = async () => {
     if (!videoJob?.videoId) return;
-    const result = await checkVideoStatus(videoJob.videoId);
+    const result = await checkVideoStatus(videoJob.videoId, generationMethod === "template");
     if (result) {
       setVideoJob(result);
       if (result.status === "completed") {

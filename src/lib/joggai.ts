@@ -407,21 +407,51 @@ class JoggAiService {
     });
   }
 
-  // Create video from a template
+  // Create video from a template (JoggAI v2: POST /create_video_with_template)
   async createVideoFromTemplate(config: {
     templateId: number | string;
-    variables: Array<{ key: string; value: string }>;
+    variables: Array<{ type: string; name: string; properties: { content?: string; url?: string; asset_id?: number } }>;
     videoName?: string;
-    aspectRatio?: "landscape" | "portrait" | "square";
+    avatarId?: number | string;
+    avatarType?: 0 | 1;
+    voiceId?: string;
+    voiceLanguage?: string;
+    captionsEnabled?: boolean;
   }): Promise<{ video_id: string }> {
-    const data = await this.request<{ video_id: string }>("/create_video_from_template", {
+    const body: Record<string, unknown> = {
+      template_id: typeof config.templateId === "string" ? parseInt(config.templateId, 10) : config.templateId,
+      variables: config.variables,
+      voice_language: config.voiceLanguage || "english",
+    };
+    if (config.videoName) body.video_name = config.videoName;
+    if (config.avatarId) {
+      body.avatar_id = typeof config.avatarId === "string" ? parseInt(config.avatarId, 10) : config.avatarId;
+      body.avatar_type = config.avatarType ?? 0;
+    }
+    if (config.voiceId) body.voice_id = config.voiceId;
+    if (config.captionsEnabled !== undefined) body.captions_enabled = config.captionsEnabled;
+
+    const data = await this.request<{ video_id: string }>("/create_video_with_template", {
       method: "POST",
-      body: JSON.stringify({
-        template_id: typeof config.templateId === "string" ? parseInt(config.templateId, 10) : config.templateId,
-        variables: config.variables,
-        video_name: config.videoName || "Podcast Video",
-        aspect_ratio: config.aspectRatio || "landscape",
-      }),
+      body: JSON.stringify(body),
+    });
+    return data;
+  }
+
+  // Check template video status (JoggAI v2: GET /template_video/{video_id})
+  async getTemplateVideoStatus(videoId: string): Promise<{
+    status: string;
+    video_url?: string;
+    cover_url?: string;
+    progress?: number;
+  }> {
+    const data = await this.request<{
+      status: string;
+      video_url?: string;
+      cover_url?: string;
+      progress?: number;
+    }>(`/template_video/${videoId}`, {
+      method: "GET",
     });
     return data;
   }

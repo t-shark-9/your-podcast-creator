@@ -46,6 +46,7 @@ export default function AdGenerator() {
   const [coverUrl, setCoverUrl] = useState("");
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const [isImproving, setIsImproving] = useState(false);
+  const [isTemplateVideo, setIsTemplateVideo] = useState(false);
 
   // Avatar/Voice modal state
   const [avModalOpen, setAvModalOpen] = useState(false);
@@ -185,25 +186,25 @@ export default function AdGenerator() {
       // Template-based generation
       if (selectedTemplateId) {
         console.log("Using template-based generation, template ID:", selectedTemplateId);
-        const variables: Array<{ key: string; value: string }> = [
-          { key: "script", value: prompt.trim() },
-          { key: "text_content", value: prompt.trim() },
-          { key: "product_description", value: prompt.trim() },
-          { key: "ad_copy", value: prompt.trim() },
-          { key: "title", value: prompt.trim().substring(0, 60) },
+        const variables: Array<{ type: string; name: string; properties: { content?: string } }> = [
+          { type: "script", name: "script", properties: { content: prompt.trim() } },
         ];
         const avatarId = localStorage.getItem("joggai_speaker1_avatar");
+        const avatarType = parseInt(localStorage.getItem("joggai_speaker1_avatar_type") || "0");
         const voiceId = localStorage.getItem("joggai_speaker1_voice");
-        if (avatarId) variables.push({ key: "avatar_id", value: avatarId });
-        if (voiceId) variables.push({ key: "voice_id", value: voiceId });
 
         const result = await joggAiService.createVideoFromTemplate({
           templateId: selectedTemplateId,
           variables,
           videoName: "Ad - " + new Date().toISOString().split("T")[0],
-          aspectRatio: "landscape",
+          avatarId: avatarId ? parseInt(avatarId) : undefined,
+          avatarType: avatarType as 0 | 1,
+          voiceId: voiceId || undefined,
+          voiceLanguage: language === "de" ? "german" : "english",
+          captionsEnabled: true,
         });
         newVideoId = result.video_id;
+        setIsTemplateVideo(true);
       }
       // Avatar-based generation
       else {
@@ -227,11 +228,12 @@ export default function AdGenerator() {
         console.log("JoggAI response:", data);
         if (data.code !== 0) throw new Error(data.msg || "Video creation failed");
         newVideoId = data.data.video_id;
+        setIsTemplateVideo(false);
       }
 
       setVideoId(newVideoId);
       toast({ title: t("ads.status.generating"), description: t("ads.progress") });
-      pollVideoStatus(newVideoId, apiKey);
+      pollVideoStatus(newVideoId, apiKey, !!selectedTemplateId);
     } catch (error) {
       console.error("Error generating video:", error);
       toast({ title: t("ads.video.error"), description: error instanceof Error ? error.message : t("ads.video.error.desc"), variant: "destructive" });
@@ -240,13 +242,16 @@ export default function AdGenerator() {
     }
   };
 
-  const pollVideoStatus = (vid: string, apiKey: string) => {
+  const pollVideoStatus = (vid: string, apiKey: string, useTemplateEndpoint = false) => {
     if (pollingRef.current) clearInterval(pollingRef.current);
+
+    const pollEndpoint = useTemplateEndpoint ? "/template_video/" + vid : "/avatar_video/" + vid;
+    console.log("Polling video status via:", pollEndpoint);
 
     const interval = setInterval(async () => {
       try {
         const { data, error: invokeErr } = await supabase.functions.invoke("joggai-proxy", {
-          body: { endpoint: "/avatar_video/" + vid, method: "GET", apiKey },
+          body: { endpoint: pollEndpoint, method: "GET", apiKey },
         });
         if (invokeErr) { console.error("Polling proxy error:", invokeErr); return; }
 
@@ -299,6 +304,7 @@ export default function AdGenerator() {
     setVideoUrl("");
     setCoverUrl("");
     setIsGenerating(false);
+    setIsTemplateVideo(false);
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
