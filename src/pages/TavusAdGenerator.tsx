@@ -41,6 +41,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
 import tavusService from "@/lib/tavus";
 import type { TavusReplica, TavusVideo } from "@/lib/tavus";
+import { joggAiService } from "@/lib/joggai";
 import { cn } from "@/lib/utils";
 
 type AdStatus = "draft" | "generating_video" | "completed" | "failed";
@@ -69,6 +70,12 @@ export default function TavusAdGenerator() {
   const [consentVideoUrl, setConsentVideoUrl] = useState("");
   const [newReplicaName, setNewReplicaName] = useState("");
   const [isCreatingReplica, setIsCreatingReplica] = useState(false);
+
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Replica browser modal
   const [replicaModalOpen, setReplicaModalOpen] = useState(false);
@@ -125,20 +132,69 @@ export default function TavusAdGenerator() {
     }
   };
 
+  // ---- File upload ----
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("video/")) {
+        toast({ title: language === "de" ? "Nur Videos" : "Videos only", description: language === "de" ? "Bitte wähle eine Videodatei" : "Please select a video file", variant: "destructive" });
+        return;
+      }
+      if (file.size > 750 * 1024 * 1024) {
+        toast({ title: language === "de" ? "Datei zu groß" : "File too large", description: language === "de" ? "Max. 750 MB" : "Max 750 MB", variant: "destructive" });
+        return;
+      }
+      setSelectedFile(file);
+      setTrainVideoUrl(""); // clear URL if file chosen
+    }
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("video/")) {
+      if (file.size > 750 * 1024 * 1024) {
+        toast({ title: language === "de" ? "Datei zu groß" : "File too large", description: "Max 750 MB", variant: "destructive" });
+        return;
+      }
+      setSelectedFile(file);
+      setTrainVideoUrl("");
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<string> => {
+    setIsUploading(true);
+    setUploadProgress(language === "de" ? "Video wird hochgeladen..." : "Uploading video...");
+    try {
+      const url = await joggAiService.uploadAsset(file);
+      setUploadProgress(language === "de" ? "Upload abgeschlossen!" : "Upload complete!");
+      return url;
+    } catch (err) {
+      setUploadProgress("");
+      throw err;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // ---- Create Replica ----
   const handleCreateReplica = async () => {
-    if (!trainVideoUrl.trim()) {
+    if (!trainVideoUrl.trim() && !selectedFile) {
       toast({
-        title: language === "de" ? "URL fehlt" : "URL missing",
-        description: language === "de" ? "Bitte gib die URL deines Trainingsvideos ein" : "Please enter your training video URL",
+        title: language === "de" ? "Video fehlt" : "Video missing",
+        description: language === "de" ? "Bitte lade ein Video hoch oder gib eine URL ein" : "Please upload a video or enter a URL",
         variant: "destructive",
       });
       return;
     }
     setIsCreatingReplica(true);
     try {
+      let finalTrainUrl = trainVideoUrl.trim();
+      if (selectedFile && !finalTrainUrl) {
+        finalTrainUrl = await uploadFile(selectedFile);
+      }
       const result = await tavusService.createReplica({
-        train_video_url: trainVideoUrl.trim(),
+        train_video_url: finalTrainUrl,
         consent_video_url: consentVideoUrl.trim() || undefined,
         replica_name: newReplicaName.trim() || "My Replica",
       });
@@ -152,6 +208,8 @@ export default function TavusAdGenerator() {
       setTrainVideoUrl("");
       setConsentVideoUrl("");
       setNewReplicaName("");
+      setSelectedFile(null);
+      setUploadProgress("");
       // Refresh replicas list
       await loadReplicas();
     } catch (err) {
@@ -355,6 +413,12 @@ export default function TavusAdGenerator() {
             </div>
             <div className="flex items-center gap-2">
               <LanguageToggle />
+              <Link to="/ads">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Video className="w-4 h-4" />
+                  {language === "de" ? "JoggAI Ads" : "JoggAI Ads"}
+                </Button>
+              </Link>
               <Link to="/auth">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <LogIn className="w-4 h-4" />
@@ -864,8 +928,8 @@ export default function TavusAdGenerator() {
             </DialogTitle>
             <DialogDescription>
               {language === "de"
-                ? "Gib die URL deines Trainingsvideos ein. Das Video muss öffentlich zugänglich sein (z.B. S3, Google Drive Link etc.)."
-                : "Enter the URL of your training video. The video must be publicly accessible (e.g. S3, Google Drive link etc.)."}
+                ? "Lade ein Video von dir hoch oder gib eine URL ein."
+                : "Upload a video of yourself or enter a URL."}
             </DialogDescription>
           </DialogHeader>
 
@@ -879,20 +943,80 @@ export default function TavusAdGenerator() {
               />
             </div>
 
+            {/* Video upload area */}
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-1">
-                <LinkIcon className="w-3 h-3" />
-                {language === "de" ? "Trainingsvideo URL *" : "Training Video URL *"}
+              <label className="text-sm font-medium">
+                {language === "de" ? "Trainingsvideo *" : "Training Video *"}
               </label>
+
+              {/* Drop zone */}
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleFileDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  "relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all",
+                  selectedFile
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border hover:border-primary/40 hover:bg-muted/30"
+                )}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                {selectedFile ? (
+                  <div className="space-y-2">
+                    <Video className="w-8 h-8 mx-auto text-primary" />
+                    <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs"
+                      onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                    >
+                      {language === "de" ? "Entfernen" : "Remove"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="w-8 h-8 mx-auto text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      {language === "de" ? "Video hierher ziehen oder klicken" : "Drag video here or click to browse"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">MP4 / WebM, max 750 MB</p>
+                  </div>
+                )}
+              </div>
+
+              {isUploading && uploadProgress && (
+                <div className="flex items-center gap-2 text-xs text-primary">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {uploadProgress}
+                </div>
+              )}
+
+              {/* Or enter URL */}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                <div className="flex-1 border-t" />
+                <span>{language === "de" ? "oder URL eingeben" : "or enter a URL"}</span>
+                <div className="flex-1 border-t" />
+              </div>
               <Input
                 placeholder="https://example.com/my-training-video.mp4"
                 value={trainVideoUrl}
-                onChange={(e) => setTrainVideoUrl(e.target.value)}
+                onChange={(e) => { setTrainVideoUrl(e.target.value); if (e.target.value) setSelectedFile(null); }}
               />
               <p className="text-xs text-muted-foreground">
                 {language === "de"
-                  ? "2 Min Video: 1 Min sprechen + 1 Min zuhören. Min. 1080p, MP4/WebM Format."
-                  : "2 min video: 1 min speaking + 1 min listening. Min 1080p, MP4/WebM format."}
+                  ? "2 Min Video: 1 Min sprechen + 1 Min zuhören. Min. 1080p, MP4/WebM."
+                  : "2 min video: 1 min speaking + 1 min listening. Min 1080p, MP4/WebM."}
               </p>
             </div>
 
@@ -932,10 +1056,10 @@ export default function TavusAdGenerator() {
               <Button
                 className="flex-1 gap-2"
                 onClick={handleCreateReplica}
-                disabled={isCreatingReplica || !trainVideoUrl.trim()}
+                disabled={isCreatingReplica || isUploading || (!trainVideoUrl.trim() && !selectedFile)}
               >
-                {isCreatingReplica ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />{language === "de" ? "Erstelle..." : "Creating..."}</>
+                {isCreatingReplica || isUploading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" />{isUploading ? (language === "de" ? "Hochladen..." : "Uploading...") : (language === "de" ? "Erstelle..." : "Creating...")}</>
                 ) : (
                   <><Upload className="w-4 h-4" />{language === "de" ? "Replica erstellen" : "Create Replica"}</>
                 )}

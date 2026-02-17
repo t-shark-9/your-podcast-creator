@@ -359,6 +359,12 @@ export default function AdGenerator() {
             </div>
             <div className="flex items-center gap-2">
               <LanguageToggle />
+              <Link to="/tavus-ads">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <User className="w-4 h-4" />
+                  {language === "de" ? "Dein AI Clone" : "Your AI Clone"}
+                </Button>
+              </Link>
               <Link to="/auth">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <LogIn className="w-4 h-4" />
