@@ -16,25 +16,27 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { endpoint, method = "GET", payload, apiKey } = body;
+    const { endpoint, method = "GET", payload, apiKey, baseUrl } = body;
+
+    const resolvedBaseUrl = baseUrl || JOGGAI_API_URL;
 
     // Use user-provided key or fall back to server env
-    const joggApiKey =
+    const resolvedApiKey =
       apiKey || Deno.env.get("JOGGAI_API_KEY");
-    if (!joggApiKey) {
-      throw new Error("JoggAI API Key not configured");
+    if (!resolvedApiKey) {
+      throw new Error("API Key not configured");
     }
 
     if (!endpoint) {
       throw new Error("endpoint is required");
     }
 
-    console.log(`JoggAI proxy: ${method} ${endpoint}`);
+    console.log(`Proxy: ${method} ${resolvedBaseUrl}${endpoint}`);
 
     const fetchOptions: RequestInit = {
       method,
       headers: {
-        "x-api-key": joggApiKey,
+        "x-api-key": resolvedApiKey,
         "Content-Type": "application/json",
       },
     };
@@ -43,7 +45,7 @@ serve(async (req) => {
       fetchOptions.body = JSON.stringify(payload);
     }
 
-    const response = await fetch(`${JOGGAI_API_URL}${endpoint}`, fetchOptions);
+    const response = await fetch(`${resolvedBaseUrl}${endpoint}`, fetchOptions);
     const responseText = await response.text();
     
     let data;
@@ -57,7 +59,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`JoggAI proxy response: code=${data.code}, msg=${data.msg}`);
+    console.log(`Proxy response: code=${data.code}, msg=${data.msg}`);
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

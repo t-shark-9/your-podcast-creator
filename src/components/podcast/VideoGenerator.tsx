@@ -85,7 +85,7 @@ export default function VideoGenerator({
   );
   
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Persist videoJob changes to localStorage
   useEffect(() => {
