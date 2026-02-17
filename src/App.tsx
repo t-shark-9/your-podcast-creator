@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/i18n/LanguageContext";
 import Home from "./pages/Home";
 import PodcastCreator from "./pages/PodcastCreator";
 import AdGenerator from "./pages/AdGenerator";
+import TavusAdGenerator from "./pages/TavusAdGenerator";
 import Studio from "./pages/Studio";
 import VideoPodcast from "./pages/VideoPodcast";
 import Auth from "./pages/Auth";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/podcast" element={<PodcastCreator />} />
             <Route path="/video-podcast" element={<VideoPodcast />} />
             <Route path="/ads" element={<AdGenerator />} />
+            <Route path="/tavus-ads" element={<TavusAdGenerator />} />
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

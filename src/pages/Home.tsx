@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mic, Video, ArrowRight, Sparkles, LayoutTemplate, Users, ExternalLink } from "lucide-react";
+import { Mic, Video, ArrowRight, Sparkles, LayoutTemplate, Users, ExternalLink, User } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
 
@@ -119,6 +119,29 @@ export default function Home() {
                 <CardContent>
                   <Button variant="secondary" className="gap-2 w-full group-hover:gap-3 transition-all">
                     {t("home.ads.cta")}
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Tavus Ads Card */}
+            <Link to="/tavus-ads" className="group">
+              <Card className="h-full border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-accent/50 hover:glow-accent">
+                <CardHeader className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                    <User className="w-7 h-7 text-accent" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Tavus Ad Generator</CardTitle>
+                    <CardDescription className="mt-1.5">
+                      Create ads with your own AI clone — upload a video of yourself and generate personalized video ads.
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="secondary" className="gap-2 w-full group-hover:gap-3 transition-all">
+                    Create with Tavus
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </CardContent>
