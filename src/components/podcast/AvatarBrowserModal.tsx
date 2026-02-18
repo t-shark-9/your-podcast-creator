@@ -82,13 +82,39 @@ export default function AvatarBrowserModal({
     }
     setHasApiKey(true);
     setIsLoading(true);
+    // Hardcoded private avatars that should always appear
+    const privateAvatars: JoggAiAvatar[] = [
+      {
+        avatar_id: 402978,
+        name: "Tjark (Private)",
+        cover_url: "https://res-intl.jogg.ai/media/120/cover/2026-02-18/1771355206185-68805ebf87e5ee13c04beb177aaa3653777d3f35-cover.png",
+        preview_url: "",
+        gender: "male",
+        age_range: "adult",
+        persona: "professional",
+      },
+      {
+        avatar_id: 403344,
+        name: "Tjark Alt (Private)",
+        cover_url: "https://res-intl.jogg.ai/media/120/cover/2026-02-18/1771355206185-68805ebf87e5ee13c04beb177aaa3653777d3f35-cover.png",
+        preview_url: "",
+        gender: "male",
+        age_range: "adult",
+        persona: "professional",
+      },
+    ];
+
     try {
       const [pub, photo] = await Promise.all([
         joggAiService.getPublicAvatars(),
         joggAiService.getPhotoAvatars(),
       ]);
       setPublicAvatars(Array.isArray(pub) ? pub : []);
-      setPhotoAvatars(Array.isArray(photo) ? photo : []);
+      // Merge hardcoded private avatars with any from API
+      const apiPhoto = Array.isArray(photo) ? photo : [];
+      const existingIds = new Set(apiPhoto.map(a => a.avatar_id));
+      const mergedPhoto = [...privateAvatars.filter(a => !existingIds.has(a.avatar_id)), ...apiPhoto];
+      setPhotoAvatars(mergedPhoto);
     } catch (error) {
       console.error("Error loading avatars:", error);
       toast({
