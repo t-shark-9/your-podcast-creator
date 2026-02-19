@@ -277,8 +277,18 @@ export default function VideoWorkflow() {
         duration: "5",
       });
       
+      console.log("Avatar generation response:", result);
+      
+      // Check for API errors
+      if (result.code !== 0) {
+        throw new Error(`API error (${result.code}): ${result.message}`);
+      }
+      
       const taskId = result.data?.task_id;
-      if (!taskId) throw new Error("No task ID returned");
+      if (!taskId) {
+        console.error("Full response:", JSON.stringify(result, null, 2));
+        throw new Error("No task ID returned");
+      }
       
       const completed = await pollForCompletion(taskId, "text2video");
       const videoUrl = completed.data?.task_result?.videos?.[0]?.url;
@@ -406,8 +416,18 @@ export default function VideoWorkflow() {
           taskType = "text2video";
         }
         
+        console.log("API Response:", result);
+        
+        // Check for API errors first
+        if (result.code !== 0) {
+          throw new Error(`API error (${result.code}): ${result.message}`);
+        }
+        
         const taskId = result.data?.task_id;
-        if (!taskId) throw new Error("No task ID returned from API");
+        if (!taskId) {
+          console.error("Full API response:", JSON.stringify(result, null, 2));
+          throw new Error("No task ID returned from API - check console for details");
+        }
         
         setGenerationStatus(`Video ${i + 1}/${totalSegments}: Processing... (Task: ${taskId.substring(0, 8)}...)`);
         
