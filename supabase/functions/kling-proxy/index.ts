@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const JOGGAI_API_URL = "https://api.jogg.ai/v2";
+const KLING_API_URL = "https://api.klingai.com";
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -16,68 +16,55 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { endpoint, method = "GET", payload, apiKey, baseUrl, authType = "x-api-key" } = body;
+    const { endpoint, method = "GET", payload, apiKey } = body;
 
-    const resolvedBaseUrl = baseUrl || JOGGAI_API_URL;
-
-    // Use user-provided key or fall back to server env
-    const resolvedApiKey =
-      apiKey || Deno.env.get("JOGGAI_API_KEY");
-    if (!resolvedApiKey) {
-      throw new Error("API Key not configured");
+    if (!apiKey) {
+      throw new Error("Kling API Key is required");
     }
 
     if (!endpoint) {
       throw new Error("endpoint is required");
     }
 
-    console.log(`Proxy: ${method} ${resolvedBaseUrl}${endpoint}`);
-
-    // Build headers based on authType
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    
-    if (authType === "bearer") {
-      headers["Authorization"] = `Bearer ${resolvedApiKey}`;
-    } else {
-      headers["x-api-key"] = resolvedApiKey;
-    }
+    console.log(`Kling proxy: ${method} ${endpoint}`);
 
     const fetchOptions: RequestInit = {
       method,
-      headers,
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
     };
 
     if (method !== "GET" && payload) {
       fetchOptions.body = JSON.stringify(payload);
     }
 
-    const response = await fetch(`${resolvedBaseUrl}${endpoint}`, fetchOptions);
+    const response = await fetch(`${KLING_API_URL}${endpoint}`, fetchOptions);
     const responseText = await response.text();
     
     let data;
     try {
       data = JSON.parse(responseText);
     } catch {
-      console.error(`API returned non-JSON (status ${response.status}):`, responseText.substring(0, 500));
+      console.error(`Kling returned non-JSON (status ${response.status}):`, responseText.substring(0, 500));
       return new Response(
-        JSON.stringify({ code: -1, msg: `API returned non-JSON response (HTTP ${response.status})`, data: null }),
+        JSON.stringify({ code: -1, message: `Kling API returned non-JSON response (HTTP ${response.status})`, data: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 502 }
       );
     }
 
-    console.log(`Proxy response: code=${data.code}, msg=${data.msg || data.message}`);
+    console.log(`Kling proxy response: code=${data.code}, message=${data.message}`);
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: response.status >= 400 ? response.status : 200,
     });
   } catch (error) {
-    console.error("Proxy error:", error);
+    console.error("Kling proxy error:", error);
     const msg = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ code: -1, msg, data: null }),
+      JSON.stringify({ code: -1, message: msg, data: null }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,

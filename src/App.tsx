@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import PodcastCreator from "./pages/PodcastCreator";
 import AdGenerator from "./pages/AdGenerator";
 import TavusAdGenerator from "./pages/TavusAdGenerator";
+import KlingAdGenerator from "./pages/KlingAdGenerator";
 import Studio from "./pages/Studio";
 import VideoPodcast from "./pages/VideoPodcast";
 import Auth from "./pages/Auth";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/video-podcast" element={<VideoPodcast />} />
             <Route path="/ads" element={<AdGenerator />} />
             <Route path="/tavus-ads" element={<TavusAdGenerator />} />
+            <Route path="/kling-ads" element={<KlingAdGenerator />} />
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
