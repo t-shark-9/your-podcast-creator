@@ -87,15 +87,15 @@ export default function AvatarBrowserModal({
     const privateAvatars: JoggAiAvatar[] = [
       {
         avatar_id: 402978,
-        name: "⭐ Tjark (Private)",
+        name: "⭐ Private Girl",
         cover_url: "https://res-intl.jogg.ai/media/120/cover/2026-02-18/1771355206185-68805ebf87e5ee13c04beb177aaa3653777d3f35-cover.png",
         preview_url: "",
-        gender: "male",
+        gender: "female",
         isPhotoAvatar: false, // Use avatar_type: 0
       },
       {
         avatar_id: 403344,
-        name: "⭐ Tjark Alt (Private)",
+        name: "⭐ Tjark (Private)",
         cover_url: "https://res-intl.jogg.ai/media/120/cover/2026-02-18/1771355206185-68805ebf87e5ee13c04beb177aaa3653777d3f35-cover.png",
         preview_url: "",
         gender: "male",
