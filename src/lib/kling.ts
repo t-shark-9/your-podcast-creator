@@ -39,8 +39,9 @@ export interface KieApiResponse<T = unknown> {
 
 export interface KieTaskData {
   taskId: string;
-  state?: string; // "queueing" | "processing" | "success" | "fail"
+  state?: string; // "wait" | "queueing" | "generating" | "success" | "fail"
   generateTime?: string;
+  failMsg?: string;
   videoInfo?: {
     videoId?: string;
     videoUrl?: string;
@@ -151,7 +152,7 @@ function toKlingResponse(kieResp: KieApiResponse<KieTaskData>): KlingApiResponse
   let task_status: string | undefined;
   if (state === "success") task_status = "succeed";
   else if (state === "fail") task_status = "failed";
-  else if (state === "processing" || state === "queueing") task_status = "processing";
+  else if (state === "processing" || state === "queueing" || state === "wait" || state === "generating") task_status = "processing";
 
   return {
     code: kieResp.code === 200 ? 0 : kieResp.code,
@@ -159,6 +160,7 @@ function toKlingResponse(kieResp: KieApiResponse<KieTaskData>): KlingApiResponse
     data: {
       task_id: taskId || "",
       task_status,
+      task_status_msg: kieResp.data?.failMsg,
       task_result: videoUrl
         ? { videos: [{ id: taskId || "", url: videoUrl, duration: "5" }] }
         : undefined,

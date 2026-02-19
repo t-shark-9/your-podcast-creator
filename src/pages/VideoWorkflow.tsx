@@ -269,17 +269,20 @@ export default function VideoWorkflow() {
       // Use text-to-image generation for avatar
       // For now, we'll simulate this - in production, use DALL-E or similar
       const result = await createTextToVideo({
-        model,
-        mode: qualityMode,
         prompt: `Portrait photo of ${avatarPrompt}, professional headshot, neutral background, high quality`,
-        aspectRatio: "1:1",
+        mode: qualityMode,
+        aspect_ratio: "1:1",
         duration: "5",
       });
       
-      const completed = await pollForCompletion(result.taskId);
-      if (completed.videoUrl) {
+      const taskId = result.data?.task_id;
+      if (!taskId) throw new Error("No task ID returned");
+      
+      const completed = await pollForCompletion(taskId, "text2video");
+      const videoUrl = completed.data?.task_result?.videos?.[0]?.url;
+      if (videoUrl) {
         // Extract first frame as avatar
-        setGeneratedAvatar(completed.videoUrl);
+        setGeneratedAvatar(videoUrl);
       }
     } catch (error) {
       console.error("Failed to generate avatar:", error);
@@ -378,29 +381,31 @@ export default function VideoWorkflow() {
         const inputImage = i === 0 ? generatedAvatar : previousFrameUrl || generatedAvatar;
         
         const result = await createImageToVideo({
-          model,
-          mode: qualityMode,
+          image: inputImage || "",
           prompt: fullPrompt,
-          aspectRatio,
+          mode: qualityMode,
           duration: videoLength === "single" ? (singleVideoDuration.toString() as KlingDuration) : "5",
-          imageUrl: inputImage,
         });
         
-        const completed = await pollForCompletion(result.taskId);
+        const taskId = result.data?.task_id;
+        if (!taskId) throw new Error("No task ID returned");
         
-        if (completed.videoUrl) {
+        const completed = await pollForCompletion(taskId, "image2video");
+        const videoUrl = completed.data?.task_result?.videos?.[0]?.url;
+        
+        if (videoUrl) {
           setGeneratedVideos((prev) => [
             ...prev,
             {
               id: `video-${i}`,
-              url: completed.videoUrl,
+              url: videoUrl,
               duration: parseInt(videoLength === "single" ? singleVideoDuration.toString() : "5"),
               segmentIndex: i,
             },
           ]);
           
           // Store last frame for next video (in production, extract actual last frame)
-          previousFrameUrl = completed.videoUrl;
+          previousFrameUrl = videoUrl;
         }
         
         setGenerationProgress(((i + 1) / totalSegments) * 100);
