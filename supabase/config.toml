@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.joggai-proxy]
 verify_jwt = false
+
+[functions.kling-proxy]
+verify_jwt = false

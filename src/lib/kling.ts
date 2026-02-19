@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const KLING_API_KEY = "78407c01ea77153f8c8546c00b36db84";
+const KLING_API_KEY = "3c2d33f582b294eb4c873a3f6b1d2189";
 const KLING_BASE_URL = "https://api.klingai.com";
 
 // Types
@@ -84,14 +84,12 @@ async function klingRequest<T>(
   method: "GET" | "POST" = "GET",
   payload?: unknown
 ): Promise<KlingApiResponse<T>> {
-  const { data, error } = await supabase.functions.invoke("joggai-proxy", {
+  const { data, error } = await supabase.functions.invoke("kling-proxy", {
     body: {
       endpoint,
       method,
       payload,
       apiKey: KLING_API_KEY,
-      baseUrl: KLING_BASE_URL,
-      authType: "bearer",
     },
   });
 
