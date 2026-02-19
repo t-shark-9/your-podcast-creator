@@ -126,6 +126,8 @@ async function kieRequest<T>(
   method: "GET" | "POST" = "GET",
   payload?: unknown
 ): Promise<KieApiResponse<T>> {
+  console.log(`KIE Request: ${method} ${endpoint}`, payload);
+  
   const { data, error } = await supabase.functions.invoke("kling-proxy", {
     body: {
       endpoint,
@@ -135,6 +137,8 @@ async function kieRequest<T>(
       baseUrl: KIE_BASE_URL,
     },
   });
+
+  console.log("KIE Raw Response:", data, "Error:", error);
 
   if (error) {
     throw new Error(`KIE proxy error: ${error.message}`);
