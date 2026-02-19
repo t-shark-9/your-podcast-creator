@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mic, Video, ArrowRight, Sparkles, LayoutTemplate, Users, ExternalLink, User, Wand2 } from "lucide-react";
+import { Mic, Video, ArrowRight, Sparkles, LayoutTemplate, Users, ExternalLink, User, Wand2, Film } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLanguage } from "@/i18n/LanguageContext";
 
@@ -156,15 +156,38 @@ export default function Home() {
                     <Wand2 className="w-7 h-7 text-purple-500" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl">Kling AI Generator</CardTitle>
+                    <CardTitle className="text-xl">KIE AI Generator</CardTitle>
                     <CardDescription className="mt-1.5">
-                      Generate stunning AI videos from text, images, or lip-sync audio using Kling AI.
+                      Generate AI videos with Kling, Sora, Veo, Runway, Hailuo and more models.
                     </CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <Button variant="secondary" className="gap-2 w-full group-hover:gap-3 transition-all">
-                    Create with Kling
+                    Quick Generate
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Video Workflow Card */}
+            <Link to="/video-workflow" className="group">
+              <Card className="h-full border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-pink-500/50 hover:glow-accent">
+                <CardHeader className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center group-hover:from-purple-500/20 group-hover:to-pink-500/20 transition-colors">
+                    <Film className="w-7 h-7 text-pink-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Video Workflow</CardTitle>
+                    <CardDescription className="mt-1.5">
+                      Step-by-step video creation: avatar, scenes, dialogue, with multi-segment support.
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="secondary" className="gap-2 w-full group-hover:gap-3 transition-all">
+                    Start Workflow
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </CardContent>
