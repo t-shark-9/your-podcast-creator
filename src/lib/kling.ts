@@ -268,12 +268,12 @@ export function fileToBase64(file: File): Promise<string> {
   });
 }
 
-// Model display names (kept for UI, maps to KIE Runway internally)
-export const MODEL_OPTIONS: { value: KlingModel; label: string }[] = [
-  { value: "kling-v1", label: "Runway Gen3" },
-  { value: "kling-v1-5", label: "Runway Gen3 Alpha" },
-  { value: "kling-v1-6", label: "Runway Gen3 Turbo" },
-  { value: "kling-v2-master", label: "Runway Gen3 Master" },
+// Model display names (maps to KIE Runway internally)
+export const MODEL_OPTIONS: { value: KlingModel; label: string; description: string }[] = [
+  { value: "kling-v1", label: "Runway Gen3", description: "Standard quality, good balance" },
+  { value: "kling-v1-5", label: "Runway Gen3 Alpha", description: "Improved motion and consistency" },
+  { value: "kling-v1-6", label: "Runway Gen3 Turbo", description: "Fast generation, good quality" },
+  { value: "kling-v2-master", label: "Runway Gen3 Master", description: "Highest quality output" },
 ];
 
 export const MODE_OPTIONS: { value: KlingMode; label: string }[] = [

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Upload, Wand2, Loader2, Download, X, Image, Film, Music } from "lucide-react";
+import { ArrowLeft, Upload, Wand2, Loader2, Download, X, Image, Film, Music, History, Trash2, Play } from "lucide-react";
 import {
   createTextToVideo,
   createImageToVideo,
@@ -32,12 +32,25 @@ import {
 
 type GenerationMode = "text2video" | "image2video" | "lip-sync";
 
+// Video history type
+interface VideoHistoryItem {
+  id: string;
+  url: string;
+  prompt: string;
+  model: string;
+  mode: string;
+  createdAt: string;
+  thumbnail?: string;
+}
+
+const HISTORY_KEY = "kling-video-history";
+
 export default function KlingAdGenerator() {
   // Generation mode
   const [mode, setMode] = useState<GenerationMode>("text2video");
 
   // Common params
-  const [model, setModel] = useState<KlingModel>("kling-v1-5");
+  const [model, setModel] = useState<KlingModel>("kling-v1-6");
   const [qualityMode, setQualityMode] = useState<KlingMode>("std");
   const [aspectRatio, setAspectRatio] = useState<KlingAspectRatio>("16:9");
   const [duration, setDuration] = useState<KlingDuration>("5");
@@ -45,6 +58,50 @@ export default function KlingAdGenerator() {
   const [dialogue, setDialogue] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [cfgScale, setCfgScale] = useState(0.5);
+
+  // Video history
+  const [videoHistory, setVideoHistory] = useState<VideoHistoryItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Load history on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(HISTORY_KEY);
+    if (saved) {
+      try {
+        setVideoHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load video history:", e);
+      }
+    }
+  }, []);
+
+  // Save to history
+  const saveToHistory = (url: string, promptText: string) => {
+    const newItem: VideoHistoryItem = {
+      id: Date.now().toString(),
+      url,
+      prompt: promptText,
+      model,
+      mode: qualityMode,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newItem, ...videoHistory].slice(0, 20); // Keep last 20
+    setVideoHistory(updated);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  };
+
+  // Delete from history
+  const deleteFromHistory = (id: string) => {
+    const updated = videoHistory.filter((item) => item.id !== id);
+    setVideoHistory(updated);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  };
+
+  // Clear all history
+  const clearHistory = () => {
+    setVideoHistory([]);
+    localStorage.removeItem(HISTORY_KEY);
+  };
 
   // Image-to-video params
   const [seedImage, setSeedImage] = useState<File | null>(null);
@@ -253,6 +310,7 @@ export default function KlingAdGenerator() {
       }
 
       setResultVideoUrl(videoUrl);
+      saveToHistory(videoUrl, prompt + (dialogue ? ` - "${dialogue}"` : ""));
       setStatus("Complete!");
     } catch (err) {
       console.error("Generation error:", err);
@@ -327,7 +385,10 @@ export default function KlingAdGenerator() {
                       <SelectContent className="bg-gray-700 border-gray-600">
                         {MODEL_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value} className="text-white">
-                            {opt.label}
+                            <div className="flex flex-col">
+                              <span>{opt.label}</span>
+                              <span className="text-xs text-gray-400">{opt.description}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -700,10 +761,83 @@ export default function KlingAdGenerator() {
                   and audio to sync. Great for dubbing or voice-over videos.
                 </p>
                 <p>
-                  <strong className="text-purple-400">Pro Mode:</strong> Higher quality but uses more
+                  <strong className="text-purple-400">Pro Mode:</strong> Higher quality (1080p) but uses more
                   credits and takes longer to process.
                 </p>
               </CardContent>
+            </Card>
+
+            {/* Video History */}
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg text-white flex items-center gap-2">
+                  <History className="h-5 w-5 text-purple-400" />
+                  Video History
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    {showHistory ? "Hide" : "Show"} ({videoHistory.length})
+                  </Button>
+                  {videoHistory.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearHistory}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              {showHistory && (
+                <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {videoHistory.length === 0 ? (
+                    <p className="text-gray-500 text-sm text-center py-4">
+                      No videos generated yet
+                    </p>
+                  ) : (
+                    videoHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-gray-700/50 rounded-lg p-3 space-y-2"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white truncate">{item.prompt || "No prompt"}</p>
+                            <p className="text-xs text-gray-500">
+                              {item.model} • {item.mode} • {new Date(item.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex gap-1 ml-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-purple-400 hover:text-purple-300"
+                              onClick={() => setResultVideoUrl(item.url)}
+                            >
+                              <Play className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-400 hover:text-red-300"
+                              onClick={() => deleteFromHistory(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              )}
             </Card>
           </div>
         </div>
