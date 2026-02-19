@@ -158,6 +158,7 @@ export default function VideoWorkflow() {
   const [avatarImage, setAvatarImage] = useState<string | null>(null);
   const [avatarVideo, setAvatarVideo] = useState<string | null>(null);
   const [generatedAvatar, setGeneratedAvatar] = useState<string | null>(null);
+  const [avatarType, setAvatarType] = useState<"image" | "video">("image"); // Track if avatar is image or video
   const [avatarName, setAvatarName] = useState("");
   const [savedAvatars, setSavedAvatars] = useState<SavedAvatar[]>([]);
   const [selectedSavedAvatar, setSelectedSavedAvatar] = useState<string | null>(null);
@@ -249,6 +250,7 @@ export default function VideoWorkflow() {
       const base64 = await fileToBase64(file);
       setAvatarImage(base64);
       setGeneratedAvatar(base64);
+      setAvatarType("image");
     }
   };
 
@@ -281,8 +283,10 @@ export default function VideoWorkflow() {
       const completed = await pollForCompletion(taskId, "text2video");
       const videoUrl = completed.data?.task_result?.videos?.[0]?.url;
       if (videoUrl) {
-        // Extract first frame as avatar
+        // Store the video URL - we'll use text-to-video for final generation
         setGeneratedAvatar(videoUrl);
+        setAvatarType("video");
+        setGenerationStatus("Avatar video generated!");
       }
     } catch (error) {
       console.error("Failed to generate avatar:", error);
@@ -355,73 +359,92 @@ export default function VideoWorkflow() {
 
   // Video generation
   const generateVideos = async () => {
-    if (!generatedAvatar) return;
-    
     setIsGenerating(true);
     setGenerationProgress(0);
     setGeneratedVideos([]);
+    setGenerationStatus("Starting video generation...");
     
-    const segments = videoLength === "multi" ? dialogueSegments : [{ id: "single", text: dialogue, duration: totalDuration }];
+    const segments = videoLength === "multi" ? dialogueSegments : [{ id: "single", text: dialogue || "A person speaking naturally", duration: totalDuration }];
     const totalSegments = segments.length;
+    const newVideos: GeneratedVideo[] = [];
     
     try {
-      let previousFrameUrl: string | null = null;
-      
       for (let i = 0; i < segments.length; i++) {
         const segment = segments[i];
-        setGenerationStatus(`Generating video ${i + 1} of ${totalSegments}...`);
+        setGenerationStatus(`Generating video ${i + 1} of ${totalSegments}... This may take 1-3 minutes.`);
         
-        // Build the prompt
-        let fullPrompt = segment.text;
+        // Build the prompt - include avatar description and dialogue
+        let fullPrompt = avatarPrompt 
+          ? `${avatarPrompt} speaking: "${segment.text}"`
+          : `A person speaking: "${segment.text}"`;
+        
         if (backgroundImage) {
-          fullPrompt += `. Background: professional studio setting`;
+          fullPrompt += `. Professional studio background.`;
         }
         
-        // Use the avatar image or previous frame for continuity
-        const inputImage = i === 0 ? generatedAvatar : previousFrameUrl || generatedAvatar;
+        let result;
+        let taskType: "text2video" | "image2video";
         
-        const result = await createImageToVideo({
-          image: inputImage || "",
-          prompt: fullPrompt,
-          mode: qualityMode,
-          duration: videoLength === "single" ? (singleVideoDuration.toString() as KlingDuration) : "5",
-        });
+        // Choose API based on avatar type
+        if (avatarType === "image" && generatedAvatar) {
+          // Use image-to-video when we have an actual image
+          result = await createImageToVideo({
+            image: generatedAvatar,
+            prompt: fullPrompt,
+            mode: qualityMode,
+            duration: videoLength === "single" ? (singleVideoDuration.toString() as KlingDuration) : "5",
+          });
+          taskType = "image2video";
+        } else {
+          // Use text-to-video when avatar is from prompt or no image
+          result = await createTextToVideo({
+            prompt: fullPrompt,
+            mode: qualityMode,
+            aspect_ratio: aspectRatio,
+            duration: videoLength === "single" ? (singleVideoDuration.toString() as KlingDuration) : "5",
+          });
+          taskType = "text2video";
+        }
         
         const taskId = result.data?.task_id;
-        if (!taskId) throw new Error("No task ID returned");
+        if (!taskId) throw new Error("No task ID returned from API");
         
-        const completed = await pollForCompletion(taskId, "image2video");
+        setGenerationStatus(`Video ${i + 1}/${totalSegments}: Processing... (Task: ${taskId.substring(0, 8)}...)`);
+        
+        const completed = await pollForCompletion(taskId, taskType, (status) => {
+          setGenerationStatus(`Video ${i + 1}/${totalSegments}: ${status}`);
+        });
+        
         const videoUrl = completed.data?.task_result?.videos?.[0]?.url;
         
         if (videoUrl) {
-          setGeneratedVideos((prev) => [
-            ...prev,
-            {
-              id: `video-${i}`,
-              url: videoUrl,
-              duration: parseInt(videoLength === "single" ? singleVideoDuration.toString() : "5"),
-              segmentIndex: i,
-            },
-          ]);
-          
-          // Store last frame for next video (in production, extract actual last frame)
-          previousFrameUrl = videoUrl;
+          const newVideo = {
+            id: `video-${i}`,
+            url: videoUrl,
+            duration: parseInt(videoLength === "single" ? singleVideoDuration.toString() : "5"),
+            segmentIndex: i,
+          };
+          newVideos.push(newVideo);
+          setGeneratedVideos([...newVideos]);
+        } else {
+          throw new Error("No video URL returned");
         }
         
         setGenerationProgress(((i + 1) / totalSegments) * 100);
       }
       
-      setGenerationStatus("Videos generated successfully!");
+      setGenerationStatus("✓ All videos generated successfully!");
+      setFinalVideoUrl(newVideos[0]?.url || null);
       
-      // If single video or all segments complete, set final URL
-      if (totalSegments === 1 && generatedVideos.length > 0) {
-        setFinalVideoUrl(generatedVideos[0]?.url || null);
-      }
+      // Auto-advance to finish step after short delay
+      setTimeout(() => {
+        nextStep();
+      }, 1500);
       
-      nextStep();
     } catch (error) {
       console.error("Generation failed:", error);
-      setGenerationStatus(`Generation failed: ${error}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      setGenerationStatus(`❌ Generation failed: ${errorMsg}`);
     } finally {
       setIsGenerating(false);
     }
@@ -1182,43 +1205,60 @@ export default function VideoWorkflow() {
 
             {/* Generation Progress */}
             {isGenerating && (
-              <Card className="bg-gray-800/50 border-gray-700">
+              <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 border-purple-500/50">
                 <CardContent className="pt-6">
-                  <div className="text-center mb-4">
-                    <Loader2 className="h-12 w-12 mx-auto text-purple-500 animate-spin mb-4" />
-                    <p className="text-white font-medium">{generationStatus}</p>
+                  <div className="text-center mb-6">
+                    <div className="relative w-24 h-24 mx-auto mb-4">
+                      <div className="absolute inset-0 rounded-full border-4 border-purple-500/30"></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 animate-spin"></div>
+                      <div className="absolute inset-4 rounded-full bg-purple-500/20 flex items-center justify-center">
+                        <Film className="h-8 w-8 text-purple-400" />
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-semibold text-white mb-2">Generating Your Video</h3>
+                    <p className="text-purple-300">{generationStatus}</p>
                   </div>
-                  <Progress value={generationProgress} className="h-2" />
-                  <p className="text-center text-gray-400 text-sm mt-2">
-                    {Math.round(generationProgress)}% complete
+                  <Progress value={generationProgress} className="h-3 bg-gray-700" />
+                  <div className="flex justify-between mt-2 text-sm">
+                    <span className="text-gray-400">Progress</span>
+                    <span className="text-purple-300 font-medium">{Math.round(generationProgress)}%</span>
+                  </div>
+                  <p className="text-center text-gray-500 text-xs mt-4">
+                    AI video generation typically takes 1-3 minutes per segment
                   </p>
                 </CardContent>
               </Card>
             )}
 
-            {/* Generated Videos */}
-            {generatedVideos.length > 0 && !isGenerating && (
+            {/* Show generated videos while generating more */}
+            {generatedVideos.length > 0 && (
               <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader>
-                  <CardTitle className="text-lg text-white">Generated Segments</CardTitle>
+                  <CardTitle className="text-lg text-white flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    Generated Videos ({generatedVideos.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 gap-4">
                     {generatedVideos.map((video, index) => (
-                      <div key={video.id} className="rounded-lg overflow-hidden bg-gray-700">
+                      <div key={video.id} className="rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
                         <video
                           src={video.url}
                           controls
                           className="w-full aspect-video"
+                          poster=""
                         />
-                        <div className="p-3 flex justify-between items-center">
-                          <Badge>Segment {index + 1}</Badge>
+                        <div className="p-3 flex justify-between items-center bg-gray-800">
+                          <Badge className="bg-green-600">Segment {index + 1}</Badge>
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="text-gray-300 hover:text-white"
                             onClick={() => downloadVideo(video.url, `segment-${index + 1}.mp4`)}
                           >
-                            <Download className="h-4 w-4" />
+                            <Download className="h-4 w-4 mr-1" />
+                            Download
                           </Button>
                         </div>
                       </div>
@@ -1228,17 +1268,47 @@ export default function VideoWorkflow() {
               </Card>
             )}
 
+            {/* Error/Success Status */}
+            {!isGenerating && generationStatus && generatedVideos.length === 0 && (
+              <Card className={`border ${generationStatus.includes('failed') ? 'bg-red-900/30 border-red-500/50' : 'bg-gray-800/50 border-gray-700'}`}>
+                <CardContent className="pt-6 text-center">
+                  <p className={generationStatus.includes('failed') ? 'text-red-400' : 'text-gray-300'}>
+                    {generationStatus}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Start Generation */}
             {!isGenerating && generatedVideos.length === 0 && (
-              <div className="text-center">
+              <div className="text-center space-y-4">
                 <Button
                   size="lg"
                   onClick={generateVideos}
-                  disabled={!generatedAvatar && !avatarImage}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-8"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-8 py-6 text-lg"
                 >
-                  <Wand2 className="h-5 w-5 mr-2" />
+                  <Wand2 className="h-6 w-6 mr-2" />
                   Start Generation
+                </Button>
+                <p className="text-gray-500 text-sm">
+                  {avatarType === "image" && generatedAvatar 
+                    ? "Using your uploaded image for image-to-video generation"
+                    : "Using text-to-video generation based on your description"
+                  }
+                </p>
+              </div>
+            )}
+
+            {/* Continue to Results */}
+            {!isGenerating && generatedVideos.length > 0 && (
+              <div className="text-center">
+                <Button
+                  size="lg"
+                  onClick={nextStep}
+                  className="bg-green-600 hover:bg-green-700 px-8"
+                >
+                  <Check className="h-5 w-5 mr-2" />
+                  Continue to Results
                 </Button>
               </div>
             )}
