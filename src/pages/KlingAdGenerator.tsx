@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -50,7 +52,7 @@ export default function KlingAdGenerator() {
   const [mode, setMode] = useState<GenerationMode>("text2video");
 
   // Common params
-  const [model, setModel] = useState<KlingModel>("kling-v1-6");
+  const [model, setModel] = useState<KlingModel>("kling-3.0");
   const [qualityMode, setQualityMode] = useState<KlingMode>("std");
   const [aspectRatio, setAspectRatio] = useState<KlingAspectRatio>("16:9");
   const [duration, setDuration] = useState<KlingDuration>("5");
@@ -382,14 +384,26 @@ export default function KlingAdGenerator() {
                       <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-700 border-gray-600">
-                        {MODEL_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-white">
-                            <div className="flex flex-col">
-                              <span>{opt.label}</span>
-                              <span className="text-xs text-gray-400">{opt.description}</span>
-                            </div>
-                          </SelectItem>
+                      <SelectContent className="bg-gray-700 border-gray-600 max-h-[400px]">
+                        {/* Group models by category */}
+                        {Object.entries(
+                          MODEL_OPTIONS.reduce((acc, opt) => {
+                            if (!acc[opt.category]) acc[opt.category] = [];
+                            acc[opt.category].push(opt);
+                            return acc;
+                          }, {} as Record<string, typeof MODEL_OPTIONS>)
+                        ).filter(([cat]) => cat !== "Legacy").map(([category, models]) => (
+                          <SelectGroup key={category}>
+                            <SelectLabel className="text-purple-400 font-semibold">{category}</SelectLabel>
+                            {models.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value} className="text-white">
+                                <div className="flex flex-col">
+                                  <span>{opt.label}</span>
+                                  <span className="text-xs text-gray-400">{opt.description}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>

@@ -3,11 +3,32 @@ import { supabase } from "@/integrations/supabase/client";
 const KIE_API_KEY = "3c2d33f582b294eb4c873a3f6b1d2189";
 const KIE_BASE_URL = "https://api.kie.ai";
 
-// Types
-export type KlingModel = "kling-v1" | "kling-v1-5" | "kling-v1-6" | "kling-v2-master";
+// Types - All KIE video models
+export type KieVideoModel = 
+  // Kling models
+  | "kling-2.6" | "kling-3.0"
+  // Sora 2 (OpenAI)
+  | "sora-2-pro" | "sora-2-pro-fast"
+  // Veo (Google)
+  | "veo-3.1" | "veo-3.1-fast"
+  // Runway
+  | "runway-gen4-turbo" | "runway-aleph"
+  // Hailuo
+  | "hailuo-2.3" | "hailuo-2.3-pro"
+  // Bytedance
+  | "bytedance-v1-pro" | "bytedance-v1-lite"
+  // Wan
+  | "wan-2.2-turbo"
+  // Grok Imagine
+  | "grok-imagine"
+  // Gemini Video
+  | "gemini-video";
+
+// Legacy alias for backward compatibility
+export type KlingModel = KieVideoModel | "kling-v1" | "kling-v1-5" | "kling-v1-6" | "kling-v2-master";
 export type KlingMode = "std" | "pro";
 export type KlingAspectRatio = "16:9" | "9:16" | "1:1" | "4:3" | "3:4";
-export type KlingDuration = "5" | "10";
+export type KlingDuration = "5" | "10" | "15";
 export type KieQuality = "720p" | "1080p";
 
 export interface KieApiResponse<T = unknown> {
@@ -268,12 +289,46 @@ export function fileToBase64(file: File): Promise<string> {
   });
 }
 
-// Model display names (maps to KIE Runway internally)
-export const MODEL_OPTIONS: { value: KlingModel; label: string; description: string }[] = [
-  { value: "kling-v1", label: "Runway Gen3", description: "Standard quality, good balance" },
-  { value: "kling-v1-5", label: "Runway Gen3 Alpha", description: "Improved motion and consistency" },
-  { value: "kling-v1-6", label: "Runway Gen3 Turbo", description: "Fast generation, good quality" },
-  { value: "kling-v2-master", label: "Runway Gen3 Master", description: "Highest quality output" },
+// Model display names - All KIE video models organized by provider
+export const MODEL_OPTIONS: { value: KlingModel; label: string; description: string; category: string }[] = [
+  // Kling (Kuaishou)
+  { value: "kling-3.0", label: "Kling 3.0", description: "Multi-shot storytelling, native audio, up to 15s", category: "Kling" },
+  { value: "kling-2.6", label: "Kling 2.6", description: "Audio-visual sync, speech & sound effects", category: "Kling" },
+  
+  // Sora 2 (OpenAI)
+  { value: "sora-2-pro", label: "Sora 2 Pro", description: "State-of-the-art video from OpenAI", category: "OpenAI" },
+  { value: "sora-2-pro-fast", label: "Sora 2 Pro Fast", description: "Faster Sora 2 generation", category: "OpenAI" },
+  
+  // Veo (Google)
+  { value: "veo-3.1", label: "Veo 3.1", description: "Cinematic motion, native 1080p, sync audio", category: "Google" },
+  { value: "veo-3.1-fast", label: "Veo 3.1 Fast", description: "Faster, cost-effective Veo rendering", category: "Google" },
+  
+  // Runway
+  { value: "runway-gen4-turbo", label: "Runway Gen4 Turbo", description: "Fast, affordable AI video", category: "Runway" },
+  { value: "runway-aleph", label: "Runway Aleph", description: "In-context editing, add/remove objects, restyle", category: "Runway" },
+  
+  // Hailuo (MiniMax)
+  { value: "hailuo-2.3", label: "Hailuo 2.3", description: "High-quality video, multiple styles", category: "Hailuo" },
+  { value: "hailuo-2.3-pro", label: "Hailuo 2.3 Pro", description: "Professional Hailuo quality", category: "Hailuo" },
+  
+  // Bytedance
+  { value: "bytedance-v1-pro", label: "Bytedance v1 Pro", description: "Fast, efficient video generation", category: "Bytedance" },
+  { value: "bytedance-v1-lite", label: "Bytedance v1 Lite", description: "Lightweight, quick generation", category: "Bytedance" },
+  
+  // Wan
+  { value: "wan-2.2-turbo", label: "Wan 2.2 Turbo", description: "Advanced turbo performance", category: "Wan" },
+  
+  // Grok Imagine (xAI)
+  { value: "grok-imagine", label: "Grok Imagine", description: "Text/image to video with audio, by xAI", category: "xAI" },
+  
+  // Gemini Video (Google)
+  { value: "gemini-video", label: "Gemini Video", description: "Google's Gemini video generation", category: "Google" },
+  
+  // Legacy Runway mappings (for backward compatibility)
+  { value: "kling-v1", label: "Runway Gen3 (Legacy)", description: "Legacy model mapping", category: "Legacy" },
+  { value: "kling-v1-5", label: "Runway Gen3 Alpha (Legacy)", description: "Legacy model mapping", category: "Legacy" },
+  { value: "kling-v1-6", label: "Runway Gen3 Turbo (Legacy)", description: "Legacy model mapping", category: "Legacy" },
+  { value: "kling-v2-master", label: "Runway Gen3 Master (Legacy)", description: "Legacy model mapping", category: "Legacy" },
 ];
 
 export const MODE_OPTIONS: { value: KlingMode; label: string }[] = [
