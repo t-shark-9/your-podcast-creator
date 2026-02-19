@@ -42,6 +42,7 @@ export default function KlingAdGenerator() {
   const [aspectRatio, setAspectRatio] = useState<KlingAspectRatio>("16:9");
   const [duration, setDuration] = useState<KlingDuration>("5");
   const [prompt, setPrompt] = useState("");
+  const [dialogue, setDialogue] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [cfgScale, setCfgScale] = useState(0.5);
 
@@ -147,9 +148,14 @@ export default function KlingAdGenerator() {
           throw new Error("Please enter a prompt");
         }
 
+        // Combine prompt with dialogue if provided
+        const fullPrompt = dialogue.trim() 
+          ? `${prompt.trim()}\n\nDialogue: "${dialogue.trim()}"`
+          : prompt.trim();
+
         setStatus("Starting text-to-video generation...");
         const response = await createTextToVideo({
-          prompt,
+          prompt: fullPrompt,
           negative_prompt: negativePrompt || undefined,
           model_name: model,
           cfg_scale: cfgScale,
@@ -177,9 +183,14 @@ export default function KlingAdGenerator() {
         }
 
         setStatus("Starting image-to-video generation...");
+        // Combine prompt with dialogue if provided
+        const fullPrompt = dialogue.trim() 
+          ? `${(prompt || "").trim()}\n\nDialogue: "${dialogue.trim()}"`
+          : prompt || undefined;
+
         const response = await createImageToVideo({
           image: imageData,
-          prompt: prompt || undefined,
+          prompt: fullPrompt,
           negative_prompt: negativePrompt || undefined,
           model_name: model,
           cfg_scale: cfgScale,
@@ -525,6 +536,19 @@ export default function KlingAdGenerator() {
                     onChange={(e) => setPrompt(e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white min-h-[100px]"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Dialogue (optional)</Label>
+                  <Textarea
+                    placeholder="What should the character say? e.g., 'Hello, welcome to our product launch!'"
+                    value={dialogue}
+                    onChange={(e) => setDialogue(e.target.value)}
+                    className="bg-gray-700 border-gray-600 text-white min-h-[80px]"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Add spoken dialogue for characters in your video
+                  </p>
                 </div>
 
                 <div className="space-y-2">
