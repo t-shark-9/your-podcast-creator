@@ -232,10 +232,16 @@ export default function KlingAdGenerator() {
         taskType = "text2video";
       } else if (mode === "image2video") {
         let imageData: string;
+        let isBase64 = false;
+        
         if (seedImage) {
-          setStatus("Uploading image...");
+          setStatus("Note: File uploads will use text-to-video (KIE API limitation)...");
           imageData = await fileToBase64(seedImage);
+          isBase64 = true;
         } else if (seedImageUrl) {
+          if (!seedImageUrl.startsWith("http")) {
+            throw new Error("Please provide a valid HTTP/HTTPS image URL");
+          }
           imageData = seedImageUrl;
         } else {
           throw new Error("Please provide a seed image (file or URL)");
@@ -246,6 +252,11 @@ export default function KlingAdGenerator() {
         const fullPrompt = dialogue.trim() 
           ? `${(prompt || "").trim()}\n\nDialogue: "${dialogue.trim()}"`
           : prompt || undefined;
+
+        // Warn about base64 limitation
+        if (isBase64) {
+          setStatus("Using text-to-video (uploaded images not supported by KIE API)...");
+        }
 
         const response = await createImageToVideo({
           image: imageData,
@@ -263,7 +274,7 @@ export default function KlingAdGenerator() {
         }
 
         taskId = response.data.task_id;
-        taskType = "image2video";
+        taskType = isBase64 ? "text2video" : "image2video";
       } else {
         // Lip-sync mode
         let videoUrl: string;

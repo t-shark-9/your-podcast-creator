@@ -199,11 +199,16 @@ export async function createImageToVideo(
     waterMark: "",
   };
 
-  // If image is a URL (starts with http), use imageUrl field
+  // KIE API only accepts HTTP/HTTPS URLs for images, not base64
   if (params.image && params.image.startsWith("http")) {
     kiePayload.imageUrl = params.image;
+  } else if (params.image && params.image.startsWith("data:")) {
+    // Base64 data URLs are not supported by KIE API
+    // Fall back to text-to-video by not including imageUrl
+    console.warn("KIE API does not support base64 images. Using text-to-video instead.");
+    // Don't set imageUrl - let it be text-to-video
   } else if (params.image) {
-    // base64 — upload is not supported directly, use as imageUrl if it's a data URL
+    // Try to use as URL anyway
     kiePayload.imageUrl = params.image;
   }
 

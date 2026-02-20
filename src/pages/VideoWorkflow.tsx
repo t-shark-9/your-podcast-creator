@@ -395,9 +395,11 @@ export default function VideoWorkflow() {
         let result;
         let taskType: "text2video" | "image2video";
         
-        // Choose API based on avatar type
-        if (avatarType === "image" && generatedAvatar) {
-          // Use image-to-video when we have an actual image
+        // Check if we have a valid HTTP URL for image-to-video
+        const hasValidImageUrl = generatedAvatar && generatedAvatar.startsWith("http");
+        
+        if (avatarType === "image" && hasValidImageUrl) {
+          // Use image-to-video only when we have an HTTP URL
           result = await createImageToVideo({
             image: generatedAvatar,
             prompt: fullPrompt,
@@ -406,7 +408,8 @@ export default function VideoWorkflow() {
           });
           taskType = "image2video";
         } else {
-          // Use text-to-video when avatar is from prompt or no image
+          // Use text-to-video for everything else (prompts, base64 images, etc.)
+          // KIE API doesn't support base64 image uploads
           result = await createTextToVideo({
             prompt: fullPrompt,
             mode: qualityMode,
